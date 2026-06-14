@@ -4,7 +4,9 @@ import pytest
 
 from pixelator.config import (
     ConfigError,
+    CropConfig,
     RenderConfig,
+    TrimConfig,
     config_from_dict,
     load_config,
     merge_cli_overrides,
@@ -76,3 +78,52 @@ def test_invalid_palette_size_is_rejected():
 
     with pytest.raises(ConfigError, match="palette.colors"):
         validate_config(config)
+
+
+def test_config_accepts_crop_and_trim_from_mapping():
+    config = config_from_dict(
+        {
+            "crop": {"x": 10, "y": 12, "width": 100, "height": 80},
+            "trim": {"start": 1.5, "end": 4.0},
+        }
+    )
+
+    validate_config(config)
+
+    assert config.crop is not None
+    assert config.crop.x == 10
+    assert config.crop.y == 12
+    assert config.crop.width == 100
+    assert config.crop.height == 80
+    assert config.trim is not None
+    assert config.trim.start == 1.5
+    assert config.trim.end == 4.0
+
+
+def test_invalid_crop_dimensions_are_rejected():
+    config = config_from_dict({"crop": {"x": 0, "y": 0, "width": 0, "height": 10}})
+
+    with pytest.raises(ConfigError, match="crop.width"):
+        validate_config(config)
+
+
+def test_invalid_trim_order_is_rejected():
+    config = config_from_dict({"trim": {"start": 3.0, "end": 2.0}})
+
+    with pytest.raises(ConfigError, match="trim.end"):
+        validate_config(config)
+
+
+def test_cli_overrides_replace_crop_and_trim():
+    base = RenderConfig()
+
+    result = merge_cli_overrides(
+        base,
+        {
+            "crop": CropConfig(x=1, y=2, width=30, height=40),
+            "trim": TrimConfig(start=0.5, end=2.5),
+        },
+    )
+
+    assert result.crop == CropConfig(x=1, y=2, width=30, height=40)
+    assert result.trim == TrimConfig(start=0.5, end=2.5)
