@@ -48,7 +48,28 @@ def prepare_source_frames(
             raise VideoError("Crop rectangle is outside the source frame")
         frame_list = [frame.crop((left, upper, right, lower)) for frame in frame_list]
         metadata = VideoMetadata(width=right - left, height=lower - upper, fps=metadata.fps, duration=metadata.duration)
+    frame_list, metadata = _make_frames_encoder_safe(frame_list, metadata)
     return frame_list, metadata
+
+
+def _make_frames_encoder_safe(
+    frames: list[Image.Image],
+    metadata: VideoMetadata,
+) -> tuple[list[Image.Image], VideoMetadata]:
+    width = _even_encoder_dimension(metadata.width)
+    height = _even_encoder_dimension(metadata.height)
+    if width < 2 or height < 2:
+        raise VideoError("Output dimensions must be at least 2x2 for H.264 yuv420p encoding")
+    if (width, height) == metadata.size:
+        return frames, metadata
+    resized = [frame.crop((0, 0, width, height)) for frame in frames]
+    return resized, VideoMetadata(width=width, height=height, fps=metadata.fps, duration=metadata.duration)
+
+
+def _even_encoder_dimension(value: int) -> int:
+    if value <= 2:
+        return value
+    return value if value % 2 == 0 else value - 1
 
 
 def process_frames(

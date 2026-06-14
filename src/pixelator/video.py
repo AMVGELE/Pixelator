@@ -77,7 +77,11 @@ def write_video(frames: Iterable[Image.Image], output: str | Path, metadata: Vid
             array = np.asarray(frame.convert("RGB"), dtype=np.uint8)
             writer.send(array.tobytes())
     except Exception as exc:
-        raise VideoError(f"Could not encode video: {output}") from exc
+        detail = str(exc).strip()
+        message = f"Could not encode video: {output}"
+        if detail:
+            message = f"{message}: {detail}"
+        raise VideoError(message) from exc
     finally:
         writer.close()
 

@@ -54,11 +54,13 @@ def preview_to_source_crop(
     clamped_y = max(0, source_y)
     clamped_right = min(source_size[0], source_right)
     clamped_bottom = min(source_size[1], source_bottom)
+    source_width = _even_encoder_dimension(max(1, clamped_right - clamped_x), source_size[0] - clamped_x)
+    source_height = _even_encoder_dimension(max(1, clamped_bottom - clamped_y), source_size[1] - clamped_y)
     return CropConfig(
         x=clamped_x,
         y=clamped_y,
-        width=max(1, clamped_right - clamped_x),
-        height=max(1, clamped_bottom - clamped_y),
+        width=source_width,
+        height=source_height,
     )
 
 
@@ -211,7 +213,18 @@ def clamp_crop(crop: CropConfig, source_size: tuple[int, int]) -> CropConfig:
     y = min(max(0, crop.y), height - 1)
     right = min(width, x + max(1, crop.width))
     bottom = min(height, y + max(1, crop.height))
-    return CropConfig(x=x, y=y, width=max(1, right - x), height=max(1, bottom - y))
+    crop_width = _even_encoder_dimension(max(1, right - x), width - x)
+    crop_height = _even_encoder_dimension(max(1, bottom - y), height - y)
+    return CropConfig(x=x, y=y, width=crop_width, height=crop_height)
+
+
+def _even_encoder_dimension(value: int, max_value: int) -> int:
+    clamped = max(1, min(value, max_value))
+    if clamped < 2 and max_value >= 2:
+        return 2
+    if clamped > 2 and clamped % 2 == 1:
+        return clamped - 1
+    return clamped
 
 
 def _handle_rects(rect: QRect) -> dict[str, QRect]:

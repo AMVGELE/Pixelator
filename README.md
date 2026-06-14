@@ -38,6 +38,8 @@ pixelator input.mp4 --crop 80,40,480,360 --trim 1.5,8.0 --out output.mp4
 ```
 
 Crop uses source-video pixel coordinates. Trim uses source-video seconds.
+H.264 `yuv420p` output requires even frame dimensions, so odd crop widths or
+heights are snapped down by one pixel before encoding.
 
 ## Desktop GUI
 
@@ -52,7 +54,8 @@ Pixelator pipeline as the CLI.
 The timeline sits above the preview. Moving the scrubber refreshes the displayed
 source frame without changing the trim range. Crop can be adjusted either by
 dragging the rectangle on the preview or by entering `X`, `Y`, `Width`, and
-`Height` values; the GUI shows the output size beside those controls.
+`Height` values; the GUI shows the output size beside those controls. Odd crop
+widths or heights are snapped to even output dimensions for H.264 compatibility.
 
 ## Windows Portable Package
 
