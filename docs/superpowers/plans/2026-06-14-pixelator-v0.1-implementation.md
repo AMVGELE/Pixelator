@@ -57,7 +57,7 @@ Modify these files:
 - Create: `tests/test_package.py`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Write the packaging smoke test**
+- [x] **Step 1: Write the packaging smoke test**
 
 Create `tests/test_package.py`:
 
@@ -69,7 +69,7 @@ def test_package_exposes_version():
     assert __version__ == "0.1.0"
 ```
 
-- [ ] **Step 2: Run the smoke test and verify it fails**
+- [x] **Step 2: Run the smoke test and verify it fails**
 
 Run:
 
@@ -79,7 +79,7 @@ python -m pytest tests/test_package.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'pixelator'`.
 
-- [ ] **Step 3: Add packaging files**
+- [x] **Step 3: Add packaging files**
 
 Create `pyproject.toml`:
 
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 4: Add a temporary CLI module so package imports are complete**
+- [x] **Step 4: Add a temporary CLI module so package imports are complete**
 
 Create `src/pixelator/cli.py`:
 
@@ -186,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 ```
 
-- [ ] **Step 5: Run the smoke test and verify it passes**
+- [x] **Step 5: Run the smoke test and verify it passes**
 
 Run:
 
@@ -196,7 +196,7 @@ python -m pytest tests/test_package.py -v
 
 Expected: PASS.
 
-- [ ] **Step 6: Update progress**
+- [x] **Step 6: Update progress**
 
 Modify `docs/PROGRESS.md`:
 
@@ -213,7 +213,7 @@ Mark these items complete:
 - [x] Add project skeleton.
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
@@ -232,7 +232,7 @@ git commit -m "chore: add project skeleton"
 - Create: `tests/test_config.py`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Write config tests**
+- [x] **Step 1: Write config tests**
 
 Create `tests/test_config.py`:
 
@@ -317,7 +317,7 @@ def test_invalid_palette_size_is_rejected():
         validate_config(config)
 ```
 
-- [ ] **Step 2: Run config tests and verify they fail**
+- [x] **Step 2: Run config tests and verify they fail**
 
 Run:
 
@@ -327,7 +327,7 @@ python -m pytest tests/test_config.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'pixelator.config'`.
 
-- [ ] **Step 3: Add typed errors**
+- [x] **Step 3: Add typed errors**
 
 Create `src/pixelator/errors.py`:
 
@@ -348,7 +348,7 @@ class OutputError(PixelatorError):
     """Raised when output paths are invalid or unsafe."""
 ```
 
-- [ ] **Step 4: Implement config model**
+- [x] **Step 4: Implement config model**
 
 Create `src/pixelator/config.py`:
 
@@ -485,7 +485,7 @@ def _nested(cls: type[Any], raw: dict[str, Any]) -> Any:
     return cls(**raw)
 ```
 
-- [ ] **Step 5: Add presets**
+- [x] **Step 5: Add presets**
 
 Create `presets/fast.yaml`:
 
@@ -545,7 +545,7 @@ output:
   audio_failure: stop
 ```
 
-- [ ] **Step 6: Run config tests and verify they pass**
+- [x] **Step 6: Run config tests and verify they pass**
 
 Run:
 
@@ -555,7 +555,7 @@ python -m pytest tests/test_config.py -v
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
@@ -571,7 +571,7 @@ git commit -m "feat: add render configuration"
 - Create: `tests/test_image_ops.py`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Write image operation tests**
+- [x] **Step 1: Write image operation tests**
 
 Create `tests/test_image_ops.py`:
 
@@ -608,7 +608,7 @@ def test_adjust_frame_changes_saturation_without_changing_size():
     assert result.mode == "RGB"
 ```
 
-- [ ] **Step 2: Run image tests and verify they fail**
+- [x] **Step 2: Run image tests and verify they fail**
 
 Run:
 
@@ -618,7 +618,7 @@ python -m pytest tests/test_image_ops.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'pixelator.image_ops'`.
 
-- [ ] **Step 3: Implement image operations**
+- [x] **Step 3: Implement image operations**
 
 Create `src/pixelator/image_ops.py`:
 
@@ -653,7 +653,7 @@ def adjust_frame(image: Image.Image, config: ImageConfig) -> Image.Image:
     return result
 ```
 
-- [ ] **Step 4: Run image tests and verify they pass**
+- [x] **Step 4: Run image tests and verify they pass**
 
 Run:
 
@@ -663,7 +663,7 @@ python -m pytest tests/test_image_ops.py -v
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -679,7 +679,7 @@ git commit -m "feat: add image operations"
 - Create: `tests/test_palette.py`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Write palette tests**
+- [x] **Step 1: Write palette tests**
 
 Create `tests/test_palette.py`:
 
@@ -719,7 +719,7 @@ def test_apply_palette_uses_palette_colors():
     assert unique_rgb_count(result) <= 2
 ```
 
-- [ ] **Step 2: Run palette tests and verify they fail**
+- [x] **Step 2: Run palette tests and verify they fail**
 
 Run:
 
@@ -729,7 +729,7 @@ python -m pytest tests/test_palette.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'pixelator.palette'`.
 
-- [ ] **Step 3: Implement palette functions**
+- [x] **Step 3: Implement palette functions**
 
 Create `src/pixelator/palette.py`:
 
@@ -784,7 +784,7 @@ def unique_rgb_count(image: Image.Image) -> int:
     return len(set(image.convert("RGB").getdata()))
 ```
 
-- [ ] **Step 4: Run palette tests and verify they pass**
+- [x] **Step 4: Run palette tests and verify they pass**
 
 Run:
 
@@ -794,7 +794,7 @@ python -m pytest tests/test_palette.py -v
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -810,7 +810,7 @@ git commit -m "feat: add palette strategies"
 - Create: `tests/test_effects.py`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Write effect tests**
+- [x] **Step 1: Write effect tests**
 
 Create `tests/test_effects.py`:
 
@@ -847,7 +847,7 @@ def test_light_vhs_is_deterministic_for_frame_index():
     assert list(first.getdata()) == list(second.getdata())
 ```
 
-- [ ] **Step 2: Run effect tests and verify they fail**
+- [x] **Step 2: Run effect tests and verify they fail**
 
 Run:
 
@@ -857,7 +857,7 @@ python -m pytest tests/test_effects.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'pixelator.effects'`.
 
-- [ ] **Step 3: Implement effects**
+- [x] **Step 3: Implement effects**
 
 Create `src/pixelator/effects.py`:
 
@@ -904,7 +904,7 @@ def _apply_noise(image: Image.Image, amount: float, frame_index: int) -> Image.I
     return Image.fromarray(np.clip(array + noise, 0, 255).astype(np.uint8), "RGB")
 ```
 
-- [ ] **Step 4: Run effect tests and verify they pass**
+- [x] **Step 4: Run effect tests and verify they pass**
 
 Run:
 
@@ -914,7 +914,7 @@ python -m pytest tests/test_effects.py -v
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -930,7 +930,7 @@ git commit -m "feat: add video style effects"
 - Create: `tests/test_video.py`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Write video helper tests**
+- [x] **Step 1: Write video helper tests**
 
 Create `tests/test_video.py`:
 
@@ -975,7 +975,7 @@ def test_video_metadata_frame_size():
     assert metadata.size == (320, 180)
 ```
 
-- [ ] **Step 2: Run video tests and verify they fail**
+- [x] **Step 2: Run video tests and verify they fail**
 
 Run:
 
@@ -985,7 +985,7 @@ python -m pytest tests/test_video.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'pixelator.video'`.
 
-- [ ] **Step 3: Implement video helpers**
+- [x] **Step 3: Implement video helpers**
 
 Create `src/pixelator/video.py`:
 
@@ -1107,7 +1107,7 @@ def sample_frames(frames: list[Image.Image], sample_count: int) -> list[Image.Im
     return [frames[index] for index in indices]
 ```
 
-- [ ] **Step 4: Run video tests and verify they pass**
+- [x] **Step 4: Run video tests and verify they pass**
 
 Run:
 
@@ -1117,7 +1117,7 @@ python -m pytest tests/test_video.py -v
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -1133,7 +1133,7 @@ git commit -m "feat: add video io helpers"
 - Create: `tests/test_pipeline.py`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Write pipeline tests**
+- [x] **Step 1: Write pipeline tests**
 
 Create `tests/test_pipeline.py`:
 
@@ -1173,7 +1173,7 @@ def test_process_frames_stable_uses_shared_palette():
     assert result[1].size == (8, 8)
 ```
 
-- [ ] **Step 2: Run pipeline tests and verify they fail**
+- [x] **Step 2: Run pipeline tests and verify they fail**
 
 Run:
 
@@ -1183,7 +1183,7 @@ python -m pytest tests/test_pipeline.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'pixelator.pipeline'`.
 
-- [ ] **Step 3: Implement pipeline**
+- [x] **Step 3: Implement pipeline**
 
 Create `src/pixelator/pipeline.py`:
 
@@ -1263,7 +1263,7 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
     return final_output
 ```
 
-- [ ] **Step 4: Run pipeline tests and verify they pass**
+- [x] **Step 4: Run pipeline tests and verify they pass**
 
 Run:
 
@@ -1273,7 +1273,7 @@ python -m pytest tests/test_pipeline.py -v
 
 Expected: PASS.
 
-- [ ] **Step 5: Run all unit tests so far**
+- [x] **Step 5: Run all unit tests so far**
 
 Run:
 
@@ -1283,7 +1283,7 @@ python -m pytest -v
 
 Expected: PASS.
 
-- [ ] **Step 6: Update progress**
+- [x] **Step 6: Update progress**
 
 Modify `docs/PROGRESS.md` and mark these items complete:
 
@@ -1298,7 +1298,7 @@ Modify `docs/PROGRESS.md` and mark these items complete:
 - [x] Add global sampled palette support.
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
@@ -1314,7 +1314,7 @@ git commit -m "feat: add render pipeline"
 - Create: `tests/test_cli.py`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Write CLI tests**
+- [x] **Step 1: Write CLI tests**
 
 Create `tests/test_cli.py`:
 
@@ -1355,7 +1355,7 @@ def test_cli_dispatches_render(monkeypatch, tmp_path: Path):
     assert calls["mode"] == "fast"
 ```
 
-- [ ] **Step 2: Run CLI tests and verify the dispatch test fails**
+- [x] **Step 2: Run CLI tests and verify the dispatch test fails**
 
 Run:
 
@@ -1365,7 +1365,7 @@ python -m pytest tests/test_cli.py -v
 
 Expected: FAIL because the temporary CLI does not parse arguments or dispatch rendering.
 
-- [ ] **Step 3: Implement CLI**
+- [x] **Step 3: Implement CLI**
 
 Replace `src/pixelator/cli.py` with:
 
@@ -1419,7 +1419,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 ```
 
-- [ ] **Step 4: Run CLI tests and verify they pass**
+- [x] **Step 4: Run CLI tests and verify they pass**
 
 Run:
 
@@ -1429,7 +1429,7 @@ python -m pytest tests/test_cli.py -v
 
 Expected: PASS.
 
-- [ ] **Step 5: Run CLI help manually**
+- [x] **Step 5: Run CLI help manually**
 
 Run:
 
@@ -1439,7 +1439,7 @@ python -m pixelator --help
 
 Expected: exit code 0 and output containing `Convert videos into a light pixel-art style.`
 
-- [ ] **Step 6: Update progress**
+- [x] **Step 6: Update progress**
 
 Modify `docs/PROGRESS.md` and mark these items complete:
 
@@ -1452,7 +1452,7 @@ Modify `docs/PROGRESS.md` and mark these items complete:
 - [x] Make effects optional and subtle by default.
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
@@ -1467,7 +1467,7 @@ git commit -m "feat: add pixelator cli"
 - Modify: `README.md`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 Run:
 
@@ -1477,7 +1477,7 @@ python -m pytest -v
 
 Expected: PASS.
 
-- [ ] **Step 2: Install editable package**
+- [x] **Step 2: Install editable package**
 
 Run:
 
@@ -1487,7 +1487,7 @@ python -m pip install -e ".[dev]"
 
 Expected: installation completes successfully and `pixelator` command is available.
 
-- [ ] **Step 3: Create a tiny synthetic sample video**
+- [x] **Step 3: Create a tiny synthetic sample video**
 
 Run:
 
@@ -1511,7 +1511,7 @@ PY
 
 Expected: `outputs/sample.mp4` exists.
 
-- [ ] **Step 4: Verify fast render**
+- [x] **Step 4: Verify fast render**
 
 Run:
 
@@ -1521,7 +1521,7 @@ pixelator outputs/sample.mp4 --mode fast --out outputs/sample-fast.mp4 --overwri
 
 Expected: exit code 0 and `outputs/sample-fast.mp4` exists.
 
-- [ ] **Step 5: Verify stable render**
+- [x] **Step 5: Verify stable render**
 
 Run:
 
@@ -1531,7 +1531,7 @@ pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --ove
 
 Expected: exit code 0 and `outputs/sample-stable.mp4` exists.
 
-- [ ] **Step 6: Update README usage**
+- [x] **Step 6: Update README usage**
 
 Update `README.md` to include:
 
@@ -1549,7 +1549,7 @@ pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --ove
 Use `fast` while tuning parameters, then render `stable` for final output.
 ````
 
-- [ ] **Step 7: Update progress**
+- [x] **Step 7: Update progress**
 
 Modify `docs/PROGRESS.md`:
 
@@ -1585,7 +1585,7 @@ Set blockers:
 - None for v0.1 implementation.
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 Run:
 
@@ -1594,7 +1594,7 @@ git add README.md docs/PROGRESS.md
 git commit -m "docs: add verification workflow"
 ```
 
-- [ ] **Step 9: Push**
+- [x] **Step 9: Push**
 
 Run:
 
