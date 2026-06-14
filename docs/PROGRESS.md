@@ -36,7 +36,7 @@ It should be updated throughout development.
 ### Milestone 1 - Minimal Video Loop
 
 - [x] Add project skeleton.
-- [ ] Add CLI entry point.
+- [x] Add CLI entry point.
 - [x] Probe input video metadata.
 - [x] Decode frames.
 - [x] Apply basic pixelation.
@@ -77,6 +77,8 @@ It should be updated throughout development.
 - `py -3.11 -m pytest tests/test_video.py -v` passed.
 - `py -3.11 -m pytest tests/test_pipeline.py -v` passed.
 - `py -3.11 -m pytest -v` passed with 22 tests.
+- `py -3.11 -m pytest tests/test_cli.py -v` passed.
+- `py -3.11 -m pixelator --help` passed.
 
 ## Blockers
 
