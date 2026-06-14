@@ -81,6 +81,26 @@ def write_video(frames: Iterable[Image.Image], output: str | Path, metadata: Vid
         writer.close()
 
 
+def frame_window(
+    metadata: VideoMetadata,
+    start_seconds: float = 0.0,
+    end_seconds: float | None = None,
+    frame_count: int | None = None,
+) -> tuple[int, int]:
+    total = frame_count
+    if total is None and metadata.duration is not None:
+        total = max(0, round(metadata.duration * metadata.fps))
+    start_index = max(0, int(start_seconds * metadata.fps))
+    if end_seconds is None:
+        end_index = total if total is not None else start_index
+    else:
+        end_index = max(start_index, int(end_seconds * metadata.fps))
+    if total is not None:
+        start_index = min(start_index, total)
+        end_index = min(end_index, total)
+    return start_index, end_index
+
+
 def mux_audio(source_video: str | Path, silent_video: str | Path, output: str | Path) -> None:
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
     command = [
