@@ -85,6 +85,7 @@ It should be updated throughout development.
 - `pixelator outputs/sample.mp4 --mode fast --out outputs/sample-fast.mp4 --overwrite --no-audio` passed.
 - `pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --overwrite --no-audio` passed.
 - Output probe passed for `outputs/sample.mp4`, `outputs/sample-fast.mp4`, and `outputs/sample-stable.mp4` at `96x64 @ 12fps`.
+- Audio preservation probe passed for `outputs/sample-audio-fast.mp4`; FFmpeg reported an AAC audio stream in the rendered output.
 
 ## Blockers
 
