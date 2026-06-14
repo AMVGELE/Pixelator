@@ -30,3 +30,11 @@ pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --ove
 ```
 
 Use `fast` while tuning parameters, then render `stable` for final output.
+
+## Crop And Trim
+
+```bash
+pixelator input.mp4 --crop 80,40,480,360 --trim 1.5,8.0 --out output.mp4
+```
+
+Crop uses source-video pixel coordinates. Trim uses source-video seconds.
