@@ -6,7 +6,7 @@ It should be updated throughout development.
 ## Current Status
 
 - Phase: v0.1 implemented
-- Active milestone: GUI-1 - Pipeline Crop And Trim
+- Active milestone: GUI-2 - Desktop Skeleton
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
 - GUI design spec: `docs/superpowers/specs/2026-06-14-desktop-gui-design.md`
@@ -145,6 +145,7 @@ It should be updated throughout development.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_cli.py -v` passed with 4 tests after adding CLI crop and trim flags.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_video.py tests\test_pipeline.py -v` passed with 11 tests after applying crop and trim to source frames.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_config.py tests\test_cli.py tests\test_video.py tests\test_pipeline.py -v` passed with 25 tests after adding audio trim mux arguments.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_gui_models.py -v` passed with 3 tests after adding GUI queue and render settings models.
 
 ## Blockers
 
