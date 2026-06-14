@@ -146,6 +146,7 @@ It should be updated throughout development.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_video.py tests\test_pipeline.py -v` passed with 11 tests after applying crop and trim to source frames.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_config.py tests\test_cli.py tests\test_video.py tests\test_pipeline.py -v` passed with 25 tests after adding audio trim mux arguments.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_gui_models.py -v` passed with 3 tests after adding GUI queue and render settings models.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_gui_preview.py -v` passed with 3 tests after adding crop coordinate mapping helpers.
 
 ## Blockers
 
