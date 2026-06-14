@@ -18,3 +18,15 @@ pixelator input.mp4 --config presets/stable.yaml --out output-stable.mp4
 
 `fast` mode is for quick parameter previews. `stable` mode is for final renders with
 reduced temporal color flicker.
+
+## Verification
+
+After installation, run:
+
+```bash
+python -m pytest -v
+pixelator outputs/sample.mp4 --mode fast --out outputs/sample-fast.mp4 --overwrite --no-audio
+pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --overwrite --no-audio
+```
+
+Use `fast` while tuning parameters, then render `stable` for final output.

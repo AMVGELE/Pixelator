@@ -5,8 +5,8 @@ It should be updated throughout development.
 
 ## Current Status
 
-- Phase: Implementation
-- Active milestone: Milestone 0 - Repository Setup
+- Phase: v0.1 implemented
+- Active milestone: Milestone 4 - Reliability Pass
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-06-14-pixelator-v0.1-implementation.md`
@@ -49,7 +49,7 @@ It should be updated throughout development.
 - [x] Add `stable` strategy.
 - [x] Add global sampled palette support.
 - [x] Add preset configs.
-- [ ] Add comparison workflow.
+- [x] Add comparison workflow.
 
 ### Milestone 3 - Effects And Presets
 
@@ -60,10 +60,10 @@ It should be updated throughout development.
 
 ### Milestone 4 - Reliability Pass
 
-- [ ] Add unit tests.
-- [ ] Add sample verification commands.
-- [ ] Improve user-facing errors.
-- [ ] Update usage docs.
+- [x] Add unit tests.
+- [x] Add sample verification commands.
+- [x] Improve user-facing errors.
+- [x] Update usage docs.
 
 ## Validation Log
 
@@ -79,6 +79,12 @@ It should be updated throughout development.
 - `py -3.11 -m pytest -v` passed with 22 tests.
 - `py -3.11 -m pytest tests/test_cli.py -v` passed.
 - `py -3.11 -m pixelator --help` passed.
+- `py -3.11 -m pytest -v` passed with 24 tests.
+- `py -3.11 -m pip install -e ".[dev]"` passed.
+- Synthetic sample video created at `outputs/sample.mp4`.
+- `pixelator outputs/sample.mp4 --mode fast --out outputs/sample-fast.mp4 --overwrite --no-audio` passed.
+- `pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --overwrite --no-audio` passed.
+- Output probe passed for `outputs/sample.mp4`, `outputs/sample-fast.mp4`, and `outputs/sample-stable.mp4` at `96x64 @ 12fps`.
 
 ## Blockers
 
