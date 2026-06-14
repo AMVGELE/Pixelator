@@ -39,7 +39,7 @@ It should be updated throughout development.
 - [ ] Add CLI entry point.
 - [ ] Probe input video metadata.
 - [ ] Decode frames.
-- [ ] Apply basic pixelation.
+- [x] Apply basic pixelation.
 - [ ] Encode output video.
 - [ ] Preserve source audio.
 
@@ -71,6 +71,7 @@ It should be updated throughout development.
 - Implementation plan approved by user on 2026-06-14.
 - `py -3.11 -m pytest tests/test_package.py -v` passed.
 - `py -3.11 -m pytest tests/test_config.py -v` passed.
+- `py -3.11 -m pytest tests/test_image_ops.py -v` passed.
 
 ## Blockers
 
