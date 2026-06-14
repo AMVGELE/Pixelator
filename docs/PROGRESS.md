@@ -6,11 +6,12 @@ It should be updated throughout development.
 ## Current Status
 
 - Phase: v0.1 implemented
-- Active milestone: GUI-0 - Desktop GUI Design
+- Active milestone: GUI-1 - Pipeline Crop And Trim
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
 - GUI design spec: `docs/superpowers/specs/2026-06-14-desktop-gui-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-06-14-pixelator-v0.1-implementation.md`
+- GUI implementation plan: `docs/superpowers/plans/2026-06-14-pixelator-desktop-gui-implementation.md`
 
 ## Decisions
 
@@ -75,8 +76,46 @@ It should be updated throughout development.
 - [x] Confirm restrained video-processing workstation visual direction.
 - [x] Include queue, preview, draggable crop selection, and source time trimming in scope.
 - [x] Add GUI design spec.
-- [ ] Review GUI design spec with user.
-- [ ] Create GUI implementation plan after design approval.
+- [x] Review GUI design spec with user.
+- [x] Create GUI implementation plan after design approval.
+
+### GUI-1 - Pipeline Crop And Trim
+
+- [ ] Add crop and trim config models.
+- [ ] Add CLI crop and trim flags.
+- [ ] Apply crop and trim in the shared render pipeline.
+- [ ] Trim source audio during mux when possible.
+- [ ] Add automated tests for config, CLI, pipeline, and video helpers.
+
+### GUI-2 - Desktop Skeleton
+
+- [ ] Add PySide6 dependency and `pixelator-gui` entry point.
+- [ ] Add main window layout.
+- [ ] Add queue panel.
+- [ ] Add settings panel.
+- [ ] Add preview and log panel placeholders.
+
+### GUI-3 - Preview, Crop, And Trim Interaction
+
+- [ ] Load source metadata and preview frames.
+- [ ] Implement draggable crop rectangle.
+- [ ] Implement trim start/end controls.
+- [ ] Bind preview state to render settings.
+
+### GUI-4 - Queue Rendering
+
+- [ ] Add background render worker.
+- [ ] Render queued jobs through the shared pipeline.
+- [ ] Update queue progress, completion, failure, and cancellation states.
+- [ ] Keep the window responsive during rendering.
+
+### GUI-5 - Packaging And Polish
+
+- [ ] Document GUI launch and usage.
+- [ ] Run full automated tests.
+- [ ] Verify CLI crop and trim against the Chinese-path test video.
+- [ ] Verify GUI launch and manual render.
+- [ ] Commit and push final GUI milestone.
 
 ## Validation Log
 
@@ -100,6 +139,8 @@ It should be updated throughout development.
 - Output probe passed for `outputs/sample.mp4`, `outputs/sample-fast.mp4`, and `outputs/sample-stable.mp4` at `96x64 @ 12fps`.
 - Audio preservation probe passed for `outputs/sample-audio-fast.mp4`; FFmpeg reported an AAC audio stream in the rendered output.
 - Desktop GUI design started on 2026-06-14.
+- Baseline before GUI implementation: `.\.venv\Scripts\python.exe -m pytest -q` passed with 25 tests and 8 Pillow deprecation warnings.
+- Desktop GUI implementation plan added on 2026-06-14.
 
 ## Blockers
 
