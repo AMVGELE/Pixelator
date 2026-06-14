@@ -8,6 +8,7 @@ from PIL import Image
 from PySide6.QtWidgets import QApplication
 
 from pixelator.config import CropConfig
+from pixelator.gui.models import VideoJob
 from pixelator.gui.main_window import MainWindow
 from pixelator.video import VideoMetadata
 
@@ -135,4 +136,27 @@ def test_numeric_crop_controls_snap_to_even_output_dimensions(monkeypatch, tmp_p
 
     assert window.queue.jobs[0].crop == CropConfig(x=0, y=0, width=24, height=18)
     assert window.crop_dimensions_label.text() == "Output: 24 x 18"
+    window.close()
+
+
+def test_start_requeues_selected_completed_job(monkeypatch, tmp_path: Path, qapp):
+    source = tmp_path / "clip.mp4"
+    source.write_bytes(b"fake")
+    window = MainWindow()
+    job = VideoJob(source_path=source, duration=10.0, width=64, height=48, fps=10.0)
+    window.queue.add(job)
+    window._refresh_queue()
+    window.queue_panel.list_widget.setCurrentRow(0)
+    window.queue.mark_completed(job.id, tmp_path / "clip-pixelated.mp4")
+    window._refresh_queue()
+    calls = []
+
+    monkeypatch.setattr(window, "_run_next_job", lambda: calls.append("run"))
+
+    window._start_queue()
+
+    assert calls == ["run"]
+    assert window.queue.jobs[0].status.value == "queued"
+    assert window.queue.jobs[0].progress == 0
+    assert window.queue.jobs[0].output_path is None
     window.close()

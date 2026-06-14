@@ -191,6 +191,12 @@ It should be updated throughout development.
 - `.\.venv\Scripts\python.exe -m pytest -q` passed with 56 tests and 8 Pillow deprecation warnings after the encoder-safe crop fix.
 - `.\scripts\package_windows.ps1` rebuilt `D:\GameJamTools\Pixelator\dist\Pixelator\Pixelator.exe` after the encoder-safe crop fix.
 - Packaged GUI smoke check passed again with `QT_QPA_PLATFORM=offscreen`; the rebuilt `Pixelator.exe` stayed alive for 3 seconds and was stopped by PID.
+- Re-render issue root cause found on 2026-06-15: after a job completed, its status stayed `completed`, while Start only looked for `queued` jobs, so a second Start on the same selected video immediately reported queue completion.
+- Added queue requeue behavior for selected `completed`, `failed`, or `cancelled` jobs when no queued jobs remain.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_gui_main_window.py tests\test_gui_models.py -v` passed with 12 tests after the requeue fix.
+- `.\.venv\Scripts\python.exe -m pytest -q` passed with 59 tests and 8 Pillow deprecation warnings after the requeue fix.
+- `.\scripts\package_windows.ps1` rebuilt `D:\GameJamTools\Pixelator\dist\Pixelator\Pixelator.exe` after the requeue fix.
+- Packaged GUI smoke check passed with `QT_QPA_PLATFORM=offscreen`; the rebuilt `Pixelator.exe` stayed alive for 3 seconds and was stopped by PID.
 
 ## Blockers
 

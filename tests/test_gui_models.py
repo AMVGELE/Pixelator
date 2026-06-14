@@ -42,6 +42,32 @@ def test_job_queue_tracks_progress_and_cancellation(tmp_path: Path):
     assert queue.jobs[0].progress == 47
 
 
+def test_job_queue_requeues_selected_finished_job(tmp_path: Path):
+    queue = JobQueue()
+    job = VideoJob(source_path=tmp_path / "clip.mp4")
+    queue.add(job)
+    queue.mark_running(job.id)
+    queue.mark_completed(job.id, tmp_path / "out.mp4")
+
+    requeued = queue.requeue_finished(job.id)
+
+    assert requeued is not None
+    assert queue.jobs[0].status == JobStatus.QUEUED
+    assert queue.jobs[0].progress == 0
+    assert queue.jobs[0].output_path is None
+    assert queue.jobs[0].error is None
+
+
+def test_job_queue_does_not_requeue_running_job(tmp_path: Path):
+    queue = JobQueue()
+    job = VideoJob(source_path=tmp_path / "clip.mp4")
+    queue.add(job)
+    queue.mark_running(job.id)
+
+    assert queue.requeue_finished(job.id) is None
+    assert queue.jobs[0].status == JobStatus.RUNNING
+
+
 def test_render_settings_create_config_with_crop_and_trim():
     settings = RenderSettings(
         mode="fast",
