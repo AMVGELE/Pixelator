@@ -101,7 +101,14 @@ def mux_audio(source_video: str | Path, silent_video: str | Path, output: str | 
         "-shortest",
         str(output),
     ]
-    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
     if completed.returncode != 0:
         raise VideoError(f"Could not mux audio into output: {completed.stderr.strip()}")
 
