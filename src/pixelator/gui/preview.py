@@ -90,12 +90,15 @@ class PreviewWidget(QWidget):
         width, height = self._source_size
         if crop is None:
             crop = CropConfig(x=0, y=0, width=width, height=height)
-        self._crop = _clamp_crop(crop, self._source_size)
+        self._crop = clamp_crop(crop, self._source_size)
         self.cropChanged.emit(self._crop)
         self.update()
 
     def crop(self) -> CropConfig | None:
         return self._crop
+
+    def source_size(self) -> tuple[int, int] | None:
+        return self._source_size
 
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
@@ -202,7 +205,7 @@ def _pil_to_qimage(image: Image.Image) -> QImage:
     return qimage.copy()
 
 
-def _clamp_crop(crop: CropConfig, source_size: tuple[int, int]) -> CropConfig:
+def clamp_crop(crop: CropConfig, source_size: tuple[int, int]) -> CropConfig:
     width, height = source_size
     x = min(max(0, crop.x), width - 1)
     y = min(max(0, crop.y), height - 1)

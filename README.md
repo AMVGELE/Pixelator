@@ -46,5 +46,24 @@ pixelator-gui
 ```
 
 The desktop GUI provides a restrained workstation layout with a queue panel, preview
-area, render settings, trim controls, and logs. It uses the same Pixelator pipeline
-as the CLI.
+area, render settings, trim controls, crop controls, and logs. It uses the same
+Pixelator pipeline as the CLI.
+
+The timeline sits above the preview. Moving the scrubber refreshes the displayed
+source frame without changing the trim range. Crop can be adjusted either by
+dragging the rectangle on the preview or by entering `X`, `Y`, `Width`, and
+`Height` values; the GUI shows the output size beside those controls.
+
+## Windows Portable Package
+
+Build the local portable package with:
+
+```powershell
+.\scripts\package_windows.ps1
+```
+
+Run the packaged GUI with:
+
+```powershell
+.\dist\Pixelator\Pixelator.exe
+```

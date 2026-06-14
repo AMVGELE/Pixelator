@@ -120,13 +120,13 @@ It should be updated throughout development.
 
 ### GUI-6 - Timeline Numeric Crop And Portable Package
 
-- [ ] Move timeline and trim controls above preview.
-- [ ] Refresh preview frames when the scrubber moves.
-- [ ] Preserve full-duration export when no trim is explicitly edited.
-- [ ] Add synchronized numeric crop controls.
-- [ ] Show crop output width and height.
-- [ ] Add Windows portable packaging script.
-- [ ] Build and smoke-check a local Windows portable package.
+- [x] Move timeline and trim controls above preview.
+- [x] Refresh preview frames when the scrubber moves.
+- [x] Preserve full-duration export when no trim is explicitly edited.
+- [x] Add synchronized numeric crop controls.
+- [x] Show crop output width and height.
+- [x] Add Windows portable packaging script.
+- [x] Build and smoke-check a local Windows portable package.
 
 ## Validation Log
 
@@ -174,6 +174,16 @@ It should be updated throughout development.
 - `.venv\Scripts\pixelator-gui.exe` exists after editable install; launching it enters the Qt event loop as expected.
 - GUI-6 implementation plan started on 2026-06-14 after user confirmed the incremental design and reported two GUI issues: a one-second GUI output and scrubber movement not refreshing the preview frame.
 - Baseline before GUI-6 implementation: `.\.venv\Scripts\python.exe -m pytest -q` passed with 46 tests and 8 Pillow deprecation warnings.
+- GUI-6 RED check: `.\.venv\Scripts\python.exe -m pytest tests\test_gui_main_window.py -v` failed as expected because moving `scrubber_slider` to `500` still requested preview frame `0.0s` instead of `5.0s`.
+- GUI-6 RED check: `.\.venv\Scripts\python.exe -m pytest tests\test_gui_preview.py tests\test_package.py -v` failed as expected because `clamp_crop` and `scripts\package_windows.ps1` did not exist yet.
+- GUI-6 crop isolation RED check failed as expected because an uncropped second queue item displayed the previous job crop; fixed by preserving current crop only during same-job scrub preview refresh.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_gui_main_window.py tests\test_gui_preview.py -v` passed with 8 tests after timeline preview, default trim, crop isolation, and numeric crop synchronization fixes.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_package.py -v` passed with 2 tests after adding the Windows packaging script and GUI package entry script.
+- `.\.venv\Scripts\python.exe -m pytest -q` passed with 52 tests and 8 Pillow deprecation warnings after GUI-6 implementation.
+- `.\scripts\package_windows.ps1` passed and created `D:\GameJamTools\Pixelator\dist\Pixelator\Pixelator.exe`.
+- Packaged GUI smoke check passed with `QT_QPA_PLATFORM=offscreen`; `Pixelator.exe` stayed alive for 3 seconds and was stopped by PID.
+- GUI default-duration verification used `D:\GameJamTools\章鱼哥.mp4` through `MainWindow` settings with no explicit trim; source duration probed as `28.5s`, output `outputs\gui-default-duration-check.mp4` probed as `28.5s` at `240x240`.
+- Offscreen layout screenshots saved to `outputs\gui-polish-screenshot.png` and `outputs\gui-polish-screenshot-font.png`; layout regions did not overlap, though Qt offscreen rendered text glyphs as square placeholders.
 
 ## Blockers
 

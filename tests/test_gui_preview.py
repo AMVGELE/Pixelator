@@ -1,5 +1,5 @@
 from pixelator.config import CropConfig
-from pixelator.gui.preview import fit_rect, preview_to_source_crop, source_to_preview_crop
+from pixelator.gui.preview import clamp_crop, fit_rect, preview_to_source_crop, source_to_preview_crop
 
 
 def test_fit_rect_letterboxes_source_inside_widget():
@@ -24,3 +24,9 @@ def test_preview_to_source_crop_clamps_to_source():
     )
 
     assert result == CropConfig(x=0, y=0, width=1000, height=500)
+
+
+def test_clamp_crop_keeps_rectangle_inside_source():
+    result = clamp_crop(CropConfig(x=90, y=40, width=30, height=20), (100, 50))
+
+    assert result == CropConfig(x=90, y=40, width=10, height=10)
