@@ -81,7 +81,7 @@ It should be updated throughout development.
 
 ### GUI-1 - Pipeline Crop And Trim
 
-- [ ] Add crop and trim config models.
+- [x] Add crop and trim config models.
 - [ ] Add CLI crop and trim flags.
 - [ ] Apply crop and trim in the shared render pipeline.
 - [ ] Trim source audio during mux when possible.
@@ -141,6 +141,7 @@ It should be updated throughout development.
 - Desktop GUI design started on 2026-06-14.
 - Baseline before GUI implementation: `.\.venv\Scripts\python.exe -m pytest -q` passed with 25 tests and 8 Pillow deprecation warnings.
 - Desktop GUI implementation plan added on 2026-06-14.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_config.py -v` passed with 9 tests after adding crop and trim config models.
 
 ## Blockers
 

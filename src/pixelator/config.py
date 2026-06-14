@@ -16,6 +16,20 @@ class PixelConfig:
 
 
 @dataclass(frozen=True)
+class CropConfig:
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+@dataclass(frozen=True)
+class TrimConfig:
+    start: float = 0.0
+    end: float | None = None
+
+
+@dataclass(frozen=True)
 class PaletteConfig:
     strategy: str = "global_sampled"
     colors: int = 32
@@ -55,6 +69,8 @@ class OutputConfig:
 class RenderConfig:
     mode: str = "stable"
     pixel: PixelConfig = field(default_factory=PixelConfig)
+    crop: CropConfig | None = None
+    trim: TrimConfig | None = None
     palette: PaletteConfig = field(default_factory=PaletteConfig)
     image: ImageConfig = field(default_factory=ImageConfig)
     effects: EffectsConfig = field(default_factory=EffectsConfig)
@@ -79,6 +95,8 @@ def config_from_dict(raw: dict[str, Any]) -> RenderConfig:
     return RenderConfig(
         mode=raw.get("mode", "stable"),
         pixel=_nested(PixelConfig, raw.get("pixel", {})),
+        crop=_optional_nested(CropConfig, raw.get("crop")),
+        trim=_optional_nested(TrimConfig, raw.get("trim")),
         palette=_nested(PaletteConfig, raw.get("palette", {})),
         image=_nested(ImageConfig, raw.get("image", {})),
         effects=_nested(EffectsConfig, _normalize_effect_modes(raw.get("effects", {}))),
@@ -112,6 +130,20 @@ def validate_config(config: RenderConfig) -> None:
         raise ConfigError("pixel.scale must be at least 1")
     if config.pixel.target_width is not None and config.pixel.target_width < 16:
         raise ConfigError("pixel.target_width must be at least 16 when set")
+    if config.crop is not None:
+        if config.crop.x < 0:
+            raise ConfigError("crop.x must be at least 0")
+        if config.crop.y < 0:
+            raise ConfigError("crop.y must be at least 0")
+        if config.crop.width < 1:
+            raise ConfigError("crop.width must be at least 1")
+        if config.crop.height < 1:
+            raise ConfigError("crop.height must be at least 1")
+    if config.trim is not None:
+        if config.trim.start < 0:
+            raise ConfigError("trim.start must be at least 0")
+        if config.trim.end is not None and config.trim.end <= config.trim.start:
+            raise ConfigError("trim.end must be greater than trim.start")
     if not 2 <= config.palette.colors <= 256:
         raise ConfigError("palette.colors must be between 2 and 256")
     if config.palette.sample_frames < 1:
@@ -131,6 +163,12 @@ def _nested(cls: type[Any], raw: dict[str, Any]) -> Any:
         return cls(**raw)
     except TypeError as exc:
         raise ConfigError(f"{cls.__name__} contains an unsupported field") from exc
+
+
+def _optional_nested(cls: type[Any], raw: dict[str, Any] | None) -> Any:
+    if raw is None:
+        return None
+    return _nested(cls, raw)
 
 
 def _normalize_effect_modes(raw: dict[str, Any]) -> dict[str, Any]:
