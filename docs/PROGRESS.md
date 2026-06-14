@@ -74,6 +74,7 @@ It should be updated throughout development.
 - `py -3.11 -m pytest tests/test_image_ops.py -v` passed.
 - `py -3.11 -m pytest tests/test_palette.py -v` passed.
 - `py -3.11 -m pytest tests/test_effects.py -v` passed.
+- `py -3.11 -m pytest tests/test_video.py -v` passed.
 
 ## Blockers
 
