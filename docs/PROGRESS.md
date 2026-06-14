@@ -5,7 +5,7 @@ It should be updated throughout development.
 
 ## Current Status
 
-- Phase: Implementation planning
+- Phase: Implementation
 - Active milestone: Milestone 0 - Repository Setup
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
@@ -30,12 +30,12 @@ It should be updated throughout development.
 - [x] Review design with user.
 - [x] Create implementation plan after design approval.
 - [x] Review implementation plan with user.
-- [ ] Add project skeleton.
-- [ ] Add dependency and environment documentation.
+- [x] Add project skeleton.
+- [x] Add dependency and environment documentation.
 
 ### Milestone 1 - Minimal Video Loop
 
-- [ ] Add project skeleton.
+- [x] Add project skeleton.
 - [ ] Add CLI entry point.
 - [ ] Probe input video metadata.
 - [ ] Decode frames.
@@ -69,11 +69,11 @@ It should be updated throughout development.
 
 - Implementation plan self-review completed on 2026-06-14.
 - Implementation plan approved by user on 2026-06-14.
-- No implementation validation has run yet. The project is ready for goal-mode execution.
+- `py -3.11 -m pytest tests/test_package.py -v` passed.
 
 ## Blockers
 
-- Waiting for goal-mode implementation run.
+- None currently.
 
 ## Notes
 
