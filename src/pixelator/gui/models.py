@@ -107,3 +107,9 @@ class JobQueue:
 
     def mark_cancelled(self, job_id: str) -> VideoJob:
         return self.update(job_id, status=JobStatus.CANCELLED)
+
+    def requeue_finished(self, job_id: str) -> VideoJob | None:
+        job = next((candidate for candidate in self.jobs if candidate.id == job_id), None)
+        if job is None or job.status not in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:
+            return None
+        return self.update(job_id, status=JobStatus.QUEUED, progress=0, output_path=None, error=None)

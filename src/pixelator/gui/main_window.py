@@ -336,6 +336,11 @@ class MainWindow(QMainWindow):
         if self._active_thread is not None:
             self.append_log("Render already running.")
             return
+        if not any(job.status == JobStatus.QUEUED for job in self.queue.jobs):
+            selected = self.queue_panel.selected_job_id()
+            if selected and self.queue.requeue_finished(selected) is not None:
+                self.append_log("Requeued selected job.")
+                self._refresh_queue()
         self._run_next_job()
 
     def _run_next_job(self) -> None:
