@@ -47,7 +47,7 @@ It should be updated throughout development.
 
 - [ ] Add `fast` strategy.
 - [ ] Add `stable` strategy.
-- [ ] Add global sampled palette support.
+- [x] Add global sampled palette support.
 - [x] Add preset configs.
 - [ ] Add comparison workflow.
 
@@ -72,6 +72,7 @@ It should be updated throughout development.
 - `py -3.11 -m pytest tests/test_package.py -v` passed.
 - `py -3.11 -m pytest tests/test_config.py -v` passed.
 - `py -3.11 -m pytest tests/test_image_ops.py -v` passed.
+- `py -3.11 -m pytest tests/test_palette.py -v` passed.
 
 ## Blockers
 
