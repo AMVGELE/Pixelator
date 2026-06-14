@@ -116,6 +116,9 @@ Crop behavior:
 - Support reset-to-full-frame.
 - Support common aspect locks later, but default v1 behavior is freeform crop.
 - Show numeric crop values for `x`, `y`, `width`, and `height`.
+- Show the output `width` and `height` clearly near the crop controls.
+- Let users adjust crop `x`, `y`, `width`, and `height` with numeric inputs.
+- Keep numeric crop inputs and the draggable preview rectangle synchronized.
 
 The first implementation may preview source frames rather than fully processed pixel
 frames. Processed preview can be added later as a separate feature.
@@ -128,6 +131,8 @@ Trim controls should define a source time range:
 - End time.
 - Duration preview.
 - Scrubber position for frame preview.
+- The timeline and trim controls should sit above the preview so the current
+  frame can be checked directly under the active time controls.
 
 Trim behavior:
 
@@ -136,6 +141,8 @@ Trim behavior:
 - Prevent start from being equal to or greater than end.
 - Store values in seconds as floats internally.
 - Format values as timecode in the UI.
+- Moving the scrubber should refresh the preview frame without changing the
+  selected trim range.
 
 ### Render Settings
 
@@ -331,6 +338,16 @@ Manual checks should cover:
 - Verify Windows local environment.
 - Add packaging notes or initial PyInstaller config.
 - Run manual video tests.
+
+### Milestone GUI-6: Timeline, Numeric Crop, And Portable Package
+
+- Move timeline and trim controls above the preview.
+- Refresh the preview frame when the scrubber changes.
+- Preserve full-source export duration when no trim range is explicitly edited.
+- Add synchronized numeric crop `x`, `y`, `width`, and `height` controls.
+- Show crop output dimensions in the GUI.
+- Add a reproducible Windows portable packaging script.
+- Build and smoke-check the local portable package.
 
 ## Future Work
 

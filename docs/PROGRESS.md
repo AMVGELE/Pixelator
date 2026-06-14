@@ -6,12 +6,13 @@ It should be updated throughout development.
 ## Current Status
 
 - Phase: GUI implemented
-- Active milestone: GUI-5 - Packaging And Polish
+- Active milestone: GUI-6 - Timeline Numeric Crop And Portable Package
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
 - GUI design spec: `docs/superpowers/specs/2026-06-14-desktop-gui-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-06-14-pixelator-v0.1-implementation.md`
 - GUI implementation plan: `docs/superpowers/plans/2026-06-14-pixelator-desktop-gui-implementation.md`
+- GUI polish and packaging plan: `docs/superpowers/plans/2026-06-14-gui-timeline-crop-packaging.md`
 
 ## Decisions
 
@@ -117,6 +118,16 @@ It should be updated throughout development.
 - [x] Verify GUI launch and manual render.
 - [x] Commit and push final GUI milestone.
 
+### GUI-6 - Timeline Numeric Crop And Portable Package
+
+- [ ] Move timeline and trim controls above preview.
+- [ ] Refresh preview frames when the scrubber moves.
+- [ ] Preserve full-duration export when no trim is explicitly edited.
+- [ ] Add synchronized numeric crop controls.
+- [ ] Show crop output width and height.
+- [ ] Add Windows portable packaging script.
+- [ ] Build and smoke-check a local Windows portable package.
+
 ## Validation Log
 
 - Implementation plan self-review completed on 2026-06-14.
@@ -161,6 +172,8 @@ It should be updated throughout development.
 - `outputs\gui-pipeline-check.mp4` probed as `560x720 @ 30fps`, duration `3.0s`.
 - FFmpeg stream probe reported H.264 video and AAC stereo audio in `outputs\gui-pipeline-check.mp4`.
 - `.venv\Scripts\pixelator-gui.exe` exists after editable install; launching it enters the Qt event loop as expected.
+- GUI-6 implementation plan started on 2026-06-14 after user confirmed the incremental design and reported two GUI issues: a one-second GUI output and scrubber movement not refreshing the preview frame.
+- Baseline before GUI-6 implementation: `.\.venv\Scripts\python.exe -m pytest -q` passed with 46 tests and 8 Pillow deprecation warnings.
 
 ## Blockers
 
