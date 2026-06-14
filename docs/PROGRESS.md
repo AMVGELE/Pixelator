@@ -154,6 +154,7 @@ It should be updated throughout development.
 - Offscreen GUI loaded `D:\GameJamTools\章鱼哥.mp4`, probed metadata, and initialized full-frame crop for a Chinese-path source video.
 - Offscreen GUI queue render completed for `D:\GameJamTools\章鱼哥.mp4` with crop `120,180,360,360`, trim `0.0,1.0`, mode `fast`, pixel scale `12`, colors `12`.
 - Latest offscreen GUI output probe reported `360x360 @ 30fps`, duration `1.0s`.
+- Latest offscreen GUI output stream probe reported H.264 video and AAC stereo audio.
 - `.\.venv\Scripts\python.exe -m pytest -q` passed with 46 tests after adding preview, crop, trim, queue worker, macro-block preservation, and linear-light downsampling.
 - QtTest offscreen drag simulation changed preview crop to `x=357, y=268, width=643, height=232`.
 - `.\.venv\Scripts\pixelator.exe $env:PIXELATOR_TEST_VIDEO --mode fast --pixel-scale 8 --colors 16 --crop 80,120,560,720 --trim 1.0,4.0 --out outputs\gui-pipeline-check.mp4 --overwrite` passed using `D:\GameJamTools\章鱼哥.mp4` as the source path.
