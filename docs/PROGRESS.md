@@ -89,11 +89,11 @@ It should be updated throughout development.
 
 ### GUI-2 - Desktop Skeleton
 
-- [ ] Add PySide6 dependency and `pixelator-gui` entry point.
-- [ ] Add main window layout.
-- [ ] Add queue panel.
-- [ ] Add settings panel.
-- [ ] Add preview and log panel placeholders.
+- [x] Add PySide6 dependency and `pixelator-gui` entry point.
+- [x] Add main window layout.
+- [x] Add queue panel.
+- [x] Add settings panel.
+- [x] Add preview and log panel placeholders.
 
 ### GUI-3 - Preview, Crop, And Trim Interaction
 
@@ -147,6 +147,9 @@ It should be updated throughout development.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_config.py tests\test_cli.py tests\test_video.py tests\test_pipeline.py -v` passed with 25 tests after adding audio trim mux arguments.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_gui_models.py -v` passed with 3 tests after adding GUI queue and render settings models.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_gui_preview.py -v` passed with 3 tests after adding crop coordinate mapping helpers.
+- `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"` installed PySide6 6.11.1 successfully.
+- `QT_QPA_PLATFORM=offscreen` PySide6 smoke instantiated `MainWindow` with title `Pixelator Desktop` and minimum size `1280x720`.
+- `.\.venv\Scripts\python.exe -m pytest -q` passed with 42 tests after adding the desktop GUI skeleton.
 
 ## Blockers
 

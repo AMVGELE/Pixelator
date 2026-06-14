@@ -38,3 +38,13 @@ pixelator input.mp4 --crop 80,40,480,360 --trim 1.5,8.0 --out output.mp4
 ```
 
 Crop uses source-video pixel coordinates. Trim uses source-video seconds.
+
+## Desktop GUI
+
+```bash
+pixelator-gui
+```
+
+The desktop GUI provides a restrained workstation layout with a queue panel, preview
+area, render settings, trim controls, and logs. It uses the same Pixelator pipeline
+as the CLI.
