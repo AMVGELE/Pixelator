@@ -83,7 +83,7 @@ It should be updated throughout development.
 
 - [x] Add crop and trim config models.
 - [x] Add CLI crop and trim flags.
-- [ ] Apply crop and trim in the shared render pipeline.
+- [x] Apply crop and trim in the shared render pipeline.
 - [ ] Trim source audio during mux when possible.
 - [ ] Add automated tests for config, CLI, pipeline, and video helpers.
 
@@ -143,6 +143,7 @@ It should be updated throughout development.
 - Desktop GUI implementation plan added on 2026-06-14.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_config.py -v` passed with 9 tests after adding crop and trim config models.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_cli.py -v` passed with 4 tests after adding CLI crop and trim flags.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_video.py tests\test_pipeline.py -v` passed with 11 tests after applying crop and trim to source frames.
 
 ## Blockers
 

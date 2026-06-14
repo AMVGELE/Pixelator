@@ -14,12 +14,41 @@ from pixelator.palette import apply_palette, build_global_palette, quantize_per_
 from pixelator.video import (
     VideoMetadata,
     ensure_output_path,
+    frame_window,
     iter_frames,
     mux_audio,
     probe_video,
     sample_frames,
     write_video,
 )
+
+
+def prepare_source_frames(
+    frames: Iterable[Image.Image],
+    config: RenderConfig,
+    metadata: VideoMetadata,
+) -> tuple[list[Image.Image], VideoMetadata]:
+    frame_list = list(frames)
+    if config.trim is not None:
+        start_index, end_index = frame_window(
+            metadata,
+            start_seconds=config.trim.start,
+            end_seconds=config.trim.end,
+            frame_count=len(frame_list),
+        )
+        frame_list = frame_list[start_index:end_index]
+        duration = len(frame_list) / metadata.fps if metadata.fps else None
+        metadata = VideoMetadata(width=metadata.width, height=metadata.height, fps=metadata.fps, duration=duration)
+    if config.crop is not None:
+        left = config.crop.x
+        upper = config.crop.y
+        right = min(metadata.width, left + config.crop.width)
+        lower = min(metadata.height, upper + config.crop.height)
+        if right <= left or lower <= upper:
+            raise VideoError("Crop rectangle is outside the source frame")
+        frame_list = [frame.crop((left, upper, right, lower)) for frame in frame_list]
+        metadata = VideoMetadata(width=right - left, height=lower - upper, fps=metadata.fps, duration=metadata.duration)
+    return frame_list, metadata
 
 
 def process_frames(
@@ -55,6 +84,7 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
     final_output = ensure_output_path(output_path, overwrite=config.output.overwrite)
     metadata = probe_video(input_file)
     frames = list(iter_frames(input_file))
+    frames, metadata = prepare_source_frames(frames, config, metadata)
 
     with TemporaryDirectory(prefix="pixelator-") as temp_dir:
         silent_output = Path(temp_dir) / f"{final_output.stem}.silent.mp4"
