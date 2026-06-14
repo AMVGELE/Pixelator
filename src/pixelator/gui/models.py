@@ -100,3 +100,10 @@ class JobQueue:
 
     def mark_failed(self, job_id: str, error: str) -> VideoJob:
         return self.update(job_id, status=JobStatus.FAILED, error=error)
+
+    def mark_progress(self, job_id: str, progress: int) -> VideoJob:
+        clamped = max(0, min(100, progress))
+        return self.update(job_id, progress=clamped)
+
+    def mark_cancelled(self, job_id: str) -> VideoJob:
+        return self.update(job_id, status=JobStatus.CANCELLED)
