@@ -92,7 +92,9 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
         write_video(processed, silent_output, metadata, codec=config.output.codec)
         if config.output.keep_audio:
             try:
-                mux_audio(input_file, silent_output, final_output)
+                trim_start = config.trim.start if config.trim is not None else 0.0
+                trim_duration = metadata.duration if config.trim is not None else None
+                mux_audio(input_file, silent_output, final_output, trim_start, trim_duration)
             except VideoError:
                 if config.output.audio_failure == "stop":
                     raise

@@ -101,15 +101,26 @@ def frame_window(
     return start_index, end_index
 
 
-def mux_audio(source_video: str | Path, silent_video: str | Path, output: str | Path) -> None:
+def mux_audio(
+    source_video: str | Path,
+    silent_video: str | Path,
+    output: str | Path,
+    start_seconds: float = 0.0,
+    duration_seconds: float | None = None,
+) -> None:
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    source_input: list[str] = []
+    if start_seconds > 0:
+        source_input.extend(["-ss", str(start_seconds)])
+    if duration_seconds is not None:
+        source_input.extend(["-t", str(duration_seconds)])
+    source_input.extend(["-i", str(source_video)])
     command = [
         ffmpeg,
         "-y",
         "-i",
         str(silent_video),
-        "-i",
-        str(source_video),
+        *source_input,
         "-map",
         "0:v:0",
         "-map",
