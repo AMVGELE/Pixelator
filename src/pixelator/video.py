@@ -67,6 +67,7 @@ def write_video(frames: Iterable[Image.Image], output: str | Path, metadata: Vid
         size=metadata.size,
         fps=metadata.fps,
         codec=codec,
+        macro_block_size=1,
         pix_fmt_in="rgb24",
         pix_fmt_out="yuv420p",
     )
@@ -99,6 +100,15 @@ def frame_window(
         start_index = min(start_index, total)
         end_index = min(end_index, total)
     return start_index, end_index
+
+
+def extract_frame(path: str | Path, seconds: float = 0.0) -> Image.Image:
+    metadata = probe_video(path)
+    target_index = max(0, int(seconds * metadata.fps))
+    for index, frame in enumerate(iter_frames(path)):
+        if index >= target_index:
+            return frame
+    raise VideoError(f"Could not extract preview frame: {path}")
 
 
 def mux_audio(

@@ -6,7 +6,7 @@ It should be updated throughout development.
 ## Current Status
 
 - Phase: v0.1 implemented
-- Active milestone: GUI-2 - Desktop Skeleton
+- Active milestone: GUI-5 - Packaging And Polish
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
 - GUI design spec: `docs/superpowers/specs/2026-06-14-desktop-gui-design.md`
@@ -97,17 +97,17 @@ It should be updated throughout development.
 
 ### GUI-3 - Preview, Crop, And Trim Interaction
 
-- [ ] Load source metadata and preview frames.
-- [ ] Implement draggable crop rectangle.
-- [ ] Implement trim start/end controls.
-- [ ] Bind preview state to render settings.
+- [x] Load source metadata and preview frames.
+- [x] Implement draggable crop rectangle.
+- [x] Implement trim start/end controls.
+- [x] Bind preview state to render settings.
 
 ### GUI-4 - Queue Rendering
 
-- [ ] Add background render worker.
-- [ ] Render queued jobs through the shared pipeline.
-- [ ] Update queue progress, completion, failure, and cancellation states.
-- [ ] Keep the window responsive during rendering.
+- [x] Add background render worker.
+- [x] Render queued jobs through the shared pipeline.
+- [x] Update queue progress, completion, failure, and cancellation states.
+- [x] Keep the window responsive during rendering.
 
 ### GUI-5 - Packaging And Polish
 
@@ -150,6 +150,11 @@ It should be updated throughout development.
 - `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"` installed PySide6 6.11.1 successfully.
 - `QT_QPA_PLATFORM=offscreen` PySide6 smoke instantiated `MainWindow` with title `Pixelator Desktop` and minimum size `1280x720`.
 - `.\.venv\Scripts\python.exe -m pytest -q` passed with 42 tests after adding the desktop GUI skeleton.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_video.py tests\test_gui_preview.py -v` passed with 12 tests after adding preview frame extraction and `PreviewWidget`.
+- Offscreen GUI loaded `D:\GameJamTools\章鱼哥.mp4`, probed metadata, and initialized full-frame crop for a Chinese-path source video.
+- Offscreen GUI queue render completed for `D:\GameJamTools\章鱼哥.mp4` with crop `120,180,360,360`, trim `0.0,1.0`, mode `fast`, pixel scale `12`, colors `12`.
+- Latest offscreen GUI output probe reported `360x360 @ 30fps`, duration `1.0s`.
+- `.\.venv\Scripts\python.exe -m pytest -q` passed with 46 tests after adding preview, crop, trim, queue worker, macro-block preservation, and linear-light downsampling.
 
 ## Blockers
 

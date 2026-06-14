@@ -29,6 +29,19 @@ def test_job_queue_tracks_status_transitions(tmp_path: Path):
     assert queue.jobs[0].output_path == tmp_path / "out.mp4"
 
 
+def test_job_queue_tracks_progress_and_cancellation(tmp_path: Path):
+    queue = JobQueue()
+    job = VideoJob(source_path=tmp_path / "clip.mp4")
+
+    queue.add(job)
+    queue.mark_running(job.id)
+    queue.mark_progress(job.id, 47)
+    queue.mark_cancelled(job.id)
+
+    assert queue.jobs[0].status == JobStatus.CANCELLED
+    assert queue.jobs[0].progress == 47
+
+
 def test_render_settings_create_config_with_crop_and_trim():
     settings = RenderSettings(
         mode="fast",

@@ -5,7 +5,15 @@ import pytest
 from PIL import Image
 
 from pixelator.errors import OutputError
-from pixelator.video import VideoMetadata, ensure_output_path, frame_window, mux_audio, sample_frames
+from pixelator.video import (
+    VideoMetadata,
+    ensure_output_path,
+    extract_frame,
+    frame_window,
+    mux_audio,
+    sample_frames,
+    write_video,
+)
 
 
 def test_ensure_output_path_rejects_existing_file_without_overwrite(tmp_path: Path):
@@ -55,6 +63,44 @@ def test_frame_window_clamps_to_available_frames():
 
     assert start == 45
     assert end == 50
+
+
+def test_extract_frame_returns_frame_at_requested_time(monkeypatch, tmp_path: Path):
+    frames = [
+        Image.new("RGB", (2, 2), (index, 0, 0))
+        for index in range(5)
+    ]
+
+    monkeypatch.setattr(
+        "pixelator.video.probe_video",
+        lambda path: VideoMetadata(width=2, height=2, fps=2.0, duration=2.5),
+    )
+    monkeypatch.setattr("pixelator.video.iter_frames", lambda path: iter(frames))
+
+    result = extract_frame(tmp_path / "clip.mp4", seconds=1.1)
+
+    assert result.getpixel((0, 0)) == (2, 0, 0)
+
+
+def test_write_video_preserves_non_macroblock_dimensions(monkeypatch, tmp_path: Path):
+    calls = {}
+
+    class FakeWriter:
+        def send(self, data):
+            pass
+
+        def close(self):
+            pass
+
+    def fake_write_frames(path, **kwargs):
+        calls["kwargs"] = kwargs
+        return FakeWriter()
+
+    monkeypatch.setattr("pixelator.video.imageio_ffmpeg.write_frames", fake_write_frames)
+
+    write_video([Image.new("RGB", (360, 360), (0, 0, 0))], tmp_path / "out.mp4", VideoMetadata(360, 360, 24.0), "libx264")
+
+    assert calls["kwargs"]["macro_block_size"] == 1
 
 
 def test_mux_audio_decodes_ffmpeg_output_with_replacement(monkeypatch, tmp_path: Path):
