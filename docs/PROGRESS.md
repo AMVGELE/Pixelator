@@ -184,6 +184,13 @@ It should be updated throughout development.
 - Packaged GUI smoke check passed with `QT_QPA_PLATFORM=offscreen`; `Pixelator.exe` stayed alive for 3 seconds and was stopped by PID.
 - GUI default-duration verification used `D:\GameJamTools\章鱼哥.mp4` through `MainWindow` settings with no explicit trim; source duration probed as `28.5s`, output `outputs\gui-default-duration-check.mp4` probed as `28.5s` at `240x240`.
 - Offscreen layout screenshots saved to `outputs\gui-polish-screenshot.png` and `outputs\gui-polish-screenshot-font.png`; layout regions did not overlap, though Qt offscreen rendered text glyphs as square placeholders.
+- Encoder failure root cause found on 2026-06-15: odd crop dimensions such as `643x232` were passed to `libx264` with `yuv420p`, causing ffmpeg to report `width not divisible by 2`.
+- Added regression coverage so pipeline output dimensions are encoder-safe even numbers, GUI numeric crop controls snap to even output dimensions, and encoder error details are preserved in `VideoError`.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_pipeline.py tests\test_gui_preview.py tests\test_gui_main_window.py tests\test_video.py -v` passed with 26 tests after the encoder-safe crop fix.
+- Real odd-crop verification passed: rendering `D:\GameJamTools\章鱼哥.mp4` with crop `0,0,643,232` wrote `outputs\repro-odd-crop-fixed.mp4` as `642x232`, duration `28.5s`.
+- `.\.venv\Scripts\python.exe -m pytest -q` passed with 56 tests and 8 Pillow deprecation warnings after the encoder-safe crop fix.
+- `.\scripts\package_windows.ps1` rebuilt `D:\GameJamTools\Pixelator\dist\Pixelator\Pixelator.exe` after the encoder-safe crop fix.
+- Packaged GUI smoke check passed again with `QT_QPA_PLATFORM=offscreen`; the rebuilt `Pixelator.exe` stayed alive for 3 seconds and was stopped by PID.
 
 ## Blockers
 

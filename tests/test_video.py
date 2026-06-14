@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from pixelator.errors import OutputError
+from pixelator.errors import OutputError, VideoError
 from pixelator.video import (
     VideoMetadata,
     ensure_output_path,
@@ -101,6 +101,25 @@ def test_write_video_preserves_non_macroblock_dimensions(monkeypatch, tmp_path: 
     write_video([Image.new("RGB", (360, 360), (0, 0, 0))], tmp_path / "out.mp4", VideoMetadata(360, 360, 24.0), "libx264")
 
     assert calls["kwargs"]["macro_block_size"] == 1
+
+
+def test_write_video_includes_encoder_error_details(monkeypatch, tmp_path: Path):
+    class FakeWriter:
+        def __init__(self):
+            self.started = False
+
+        def send(self, data):
+            if self.started:
+                raise OSError("width not divisible by 2")
+            self.started = True
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("pixelator.video.imageio_ffmpeg.write_frames", lambda path, **kwargs: FakeWriter())
+
+    with pytest.raises(VideoError, match="width not divisible by 2"):
+        write_video([Image.new("RGB", (3, 2), (0, 0, 0))], tmp_path / "out.mp4", VideoMetadata(3, 2, 24.0), "libx264")
 
 
 def test_mux_audio_decodes_ffmpeg_output_with_replacement(monkeypatch, tmp_path: Path):

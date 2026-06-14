@@ -113,3 +113,26 @@ def test_numeric_crop_controls_update_job_crop(monkeypatch, tmp_path: Path, qapp
     assert window.queue.jobs[0].crop == CropConfig(x=10, y=4, width=24, height=18)
     assert window.crop_dimensions_label.text() == "Output: 24 x 18"
     window.close()
+
+
+def test_numeric_crop_controls_snap_to_even_output_dimensions(monkeypatch, tmp_path: Path, qapp):
+    source = tmp_path / "clip.mp4"
+    source.write_bytes(b"fake")
+
+    monkeypatch.setattr(
+        "pixelator.gui.main_window.probe_video",
+        lambda path: VideoMetadata(width=64, height=48, fps=10.0, duration=10.0),
+    )
+    monkeypatch.setattr(
+        "pixelator.gui.main_window.extract_frame",
+        lambda path, seconds=0.0: Image.new("RGB", (64, 48), (0, 0, 0)),
+    )
+
+    window = MainWindow()
+    window.add_video_paths([source])
+    window.crop_width_spin.setValue(25)
+    window.crop_height_spin.setValue(19)
+
+    assert window.queue.jobs[0].crop == CropConfig(x=0, y=0, width=24, height=18)
+    assert window.crop_dimensions_label.text() == "Output: 24 x 18"
+    window.close()

@@ -30,3 +30,9 @@ def test_clamp_crop_keeps_rectangle_inside_source():
     result = clamp_crop(CropConfig(x=90, y=40, width=30, height=20), (100, 50))
 
     assert result == CropConfig(x=90, y=40, width=10, height=10)
+
+
+def test_clamp_crop_uses_even_dimensions_for_video_output():
+    result = clamp_crop(CropConfig(x=10, y=4, width=31, height=19), (100, 80))
+
+    assert result == CropConfig(x=10, y=4, width=30, height=18)

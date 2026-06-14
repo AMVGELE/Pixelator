@@ -33,15 +33,26 @@ def test_process_frames_stable_uses_shared_palette():
 
 def test_prepare_source_frames_applies_crop():
     frames = [Image.new("RGB", (10, 8), (255, 0, 0))]
-    frames[0].putpixel((7, 5), (0, 255, 0))
-    config = RenderConfig(crop=CropConfig(x=5, y=4, width=3, height=2))
+    frames[0].putpixel((8, 5), (0, 255, 0))
+    config = RenderConfig(crop=CropConfig(x=5, y=4, width=4, height=2))
     metadata = VideoMetadata(width=10, height=8, fps=24.0)
 
     prepared, prepared_metadata = prepare_source_frames(frames, config, metadata)
 
-    assert prepared_metadata.size == (3, 2)
-    assert prepared[0].size == (3, 2)
-    assert prepared[0].getpixel((2, 1)) == (0, 255, 0)
+    assert prepared_metadata.size == (4, 2)
+    assert prepared[0].size == (4, 2)
+    assert prepared[0].getpixel((3, 1)) == (0, 255, 0)
+
+
+def test_prepare_source_frames_makes_crop_dimensions_even_for_h264():
+    frames = [Image.new("RGB", (10, 8), (255, 0, 0))]
+    config = RenderConfig(crop=CropConfig(x=5, y=4, width=3, height=3))
+    metadata = VideoMetadata(width=10, height=8, fps=24.0)
+
+    prepared, prepared_metadata = prepare_source_frames(frames, config, metadata)
+
+    assert prepared_metadata.size == (2, 2)
+    assert prepared[0].size == (2, 2)
 
 
 def test_prepare_source_frames_applies_trim_by_frame_range():
