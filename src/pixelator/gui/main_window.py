@@ -8,20 +8,22 @@ from PySide6.QtCore import QThread
 from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QPlainTextEdit,
     QSlider,
+    QSpinBox,
     QSplitter,
     QVBoxLayout,
     QWidget,
 )
 
-from pixelator.config import TrimConfig
+from pixelator.config import CropConfig, TrimConfig
 from pixelator.errors import PixelatorError
 from pixelator.gui.models import JobQueue, JobStatus, RenderSettings, VideoJob
-from pixelator.gui.preview import PreviewWidget
+from pixelator.gui.preview import PreviewWidget, clamp_crop
 from pixelator.gui.queue_panel import QueuePanel
 from pixelator.gui.settings_panel import SettingsPanel
 from pixelator.gui.worker import RenderWorker
@@ -33,6 +35,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.queue = JobQueue()
         self._loading_job = False
+        self._syncing_crop_controls = False
         self._active_thread: QThread | None = None
         self._active_worker: RenderWorker | None = None
         self.queue_panel = QueuePanel()
@@ -52,6 +55,18 @@ class MainWindow(QMainWindow):
         self.scrubber_slider = QSlider(Qt.Orientation.Horizontal)
         self.scrubber_slider.setRange(0, 1000)
 
+        self.crop_x_spin = QSpinBox()
+        self.crop_y_spin = QSpinBox()
+        self.crop_width_spin = QSpinBox()
+        self.crop_height_spin = QSpinBox()
+        for spin in (self.crop_x_spin, self.crop_y_spin):
+            spin.setRange(0, 0)
+            spin.setEnabled(False)
+        for spin in (self.crop_width_spin, self.crop_height_spin):
+            spin.setRange(1, 1)
+            spin.setEnabled(False)
+        self.crop_dimensions_label = QLabel("Output: - x -")
+
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(2000)
@@ -64,17 +79,32 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Ready")
 
     def _build_layout(self) -> None:
-        trim_row = QHBoxLayout()
-        trim_row.addWidget(QLabel("Start"))
-        trim_row.addWidget(self.trim_start_spin)
-        trim_row.addWidget(QLabel("End"))
-        trim_row.addWidget(self.trim_end_spin)
+        timeline_row = QHBoxLayout()
+        timeline_row.addWidget(QLabel("Timeline"))
+        timeline_row.addWidget(self.scrubber_slider, 1)
+        timeline_row.addWidget(QLabel("Start"))
+        timeline_row.addWidget(self.trim_start_spin)
+        timeline_row.addWidget(QLabel("End"))
+        timeline_row.addWidget(self.trim_end_spin)
+
+        crop_grid = QGridLayout()
+        crop_grid.addWidget(QLabel("Crop"), 0, 0)
+        crop_grid.addWidget(QLabel("X"), 0, 1)
+        crop_grid.addWidget(self.crop_x_spin, 0, 2)
+        crop_grid.addWidget(QLabel("Y"), 0, 3)
+        crop_grid.addWidget(self.crop_y_spin, 0, 4)
+        crop_grid.addWidget(QLabel("Width"), 1, 1)
+        crop_grid.addWidget(self.crop_width_spin, 1, 2)
+        crop_grid.addWidget(QLabel("Height"), 1, 3)
+        crop_grid.addWidget(self.crop_height_spin, 1, 4)
+        crop_grid.addWidget(self.crop_dimensions_label, 1, 5)
+        crop_grid.setColumnStretch(5, 1)
 
         preview_layout = QVBoxLayout()
         preview_layout.addWidget(QLabel("Preview"))
+        preview_layout.addLayout(timeline_row)
         preview_layout.addWidget(self.preview_widget, 1)
-        preview_layout.addWidget(self.scrubber_slider)
-        preview_layout.addLayout(trim_row)
+        preview_layout.addLayout(crop_grid)
 
         preview_widget = QWidget()
         preview_widget.setLayout(preview_layout)
@@ -128,6 +158,14 @@ class MainWindow(QMainWindow):
         self.preview_widget.cropChanged.connect(self._on_crop_changed)
         self.trim_start_spin.valueChanged.connect(lambda value: self._on_trim_changed())
         self.trim_end_spin.valueChanged.connect(lambda value: self._on_trim_changed())
+        self.scrubber_slider.valueChanged.connect(lambda value: self._on_scrubber_changed())
+        for spin in (
+            self.crop_x_spin,
+            self.crop_y_spin,
+            self.crop_width_spin,
+            self.crop_height_spin,
+        ):
+            spin.valueChanged.connect(lambda value: self._on_crop_spin_changed())
 
     def _choose_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
@@ -171,10 +209,9 @@ class MainWindow(QMainWindow):
             self.trim_end_spin.setRange(0.0, max(duration, 0.001))
             self.trim_start_spin.setValue(job.trim.start if job.trim else 0.0)
             self.trim_end_spin.setValue(job.trim.end if job.trim and job.trim.end is not None else duration)
-            frame = extract_frame(job.source_path, self.trim_start_spin.value())
-            self.preview_widget.set_image(frame)
-            if job.crop is not None:
-                self.preview_widget.set_crop(job.crop)
+            preview_seconds = job.trim.start if job.trim else 0.0
+            self.scrubber_slider.setValue(self._slider_value_for_seconds(job, preview_seconds))
+            self._load_preview_frame(job, preview_seconds, preserve_current_crop=False)
             self.statusBar().showMessage(str(job.source_path))
         except PixelatorError as exc:
             self.append_log(f"Could not load preview: {exc}")
@@ -184,6 +221,7 @@ class MainWindow(QMainWindow):
     def _on_crop_changed(self, crop) -> None:
         if self._loading_job:
             return
+        self._set_crop_controls_from_crop(crop)
         job_id = self.queue_panel.selected_job_id()
         if job_id:
             self.queue.update(job_id, crop=crop)
@@ -202,6 +240,97 @@ class MainWindow(QMainWindow):
             self.trim_end_spin.setValue(end)
         self.queue.update(job_id, trim=TrimConfig(start=start, end=end))
         self._refresh_queue()
+
+    def _on_scrubber_changed(self) -> None:
+        if self._loading_job:
+            return
+        job = self._job_by_id(self.queue_panel.selected_job_id())
+        if job is None:
+            return
+        seconds = self._scrubber_seconds(job)
+        try:
+            self._load_preview_frame(job, seconds, preserve_current_crop=True)
+        except PixelatorError as exc:
+            self.append_log(f"Could not load preview: {exc}")
+
+    def _on_crop_spin_changed(self) -> None:
+        if self._loading_job or self._syncing_crop_controls:
+            return
+        source_size = self.preview_widget.source_size()
+        if source_size is None:
+            return
+        crop = clamp_crop(
+            CropConfig(
+                x=self.crop_x_spin.value(),
+                y=self.crop_y_spin.value(),
+                width=self.crop_width_spin.value(),
+                height=self.crop_height_spin.value(),
+            ),
+            source_size,
+        )
+        self.preview_widget.set_crop(crop)
+
+    def _scrubber_seconds(self, job: VideoJob) -> float:
+        duration = job.duration or 0.0
+        if duration <= 0:
+            return 0.0
+        return duration * (self.scrubber_slider.value() / 1000.0)
+
+    def _slider_value_for_seconds(self, job: VideoJob, seconds: float) -> int:
+        duration = job.duration or 0.0
+        if duration <= 0:
+            return 0
+        return max(0, min(1000, round((seconds / duration) * 1000)))
+
+    def _load_preview_frame(self, job: VideoJob, seconds: float, preserve_current_crop: bool) -> None:
+        previous_crop = job.crop
+        if previous_crop is None and preserve_current_crop:
+            previous_crop = self.preview_widget.crop()
+        was_loading = self._loading_job
+        self._loading_job = True
+        try:
+            frame = extract_frame(job.source_path, seconds)
+            self.preview_widget.set_image(frame)
+            if previous_crop is not None:
+                self.preview_widget.set_crop(previous_crop)
+            crop = self.preview_widget.crop()
+            if crop is not None:
+                self._set_crop_controls_from_crop(crop)
+        finally:
+            self._loading_job = was_loading
+
+    def _set_crop_controls_from_crop(self, crop: CropConfig) -> None:
+        source_size = self.preview_widget.source_size()
+        if source_size is None:
+            self._set_crop_controls_enabled(False)
+            return
+        self._syncing_crop_controls = True
+        try:
+            source_width, source_height = source_size
+            self._set_crop_controls_enabled(True)
+            self.crop_x_spin.setRange(0, max(0, source_width - 1))
+            self.crop_y_spin.setRange(0, max(0, source_height - 1))
+            self.crop_x_spin.setValue(crop.x)
+            self.crop_y_spin.setValue(crop.y)
+            self.crop_width_spin.setRange(1, max(1, source_width - crop.x))
+            self.crop_height_spin.setRange(1, max(1, source_height - crop.y))
+            self.crop_width_spin.setValue(crop.width)
+            self.crop_height_spin.setValue(crop.height)
+            self._update_crop_dimensions(crop)
+        finally:
+            self._syncing_crop_controls = False
+
+    def _set_crop_controls_enabled(self, enabled: bool) -> None:
+        for spin in (
+            self.crop_x_spin,
+            self.crop_y_spin,
+            self.crop_width_spin,
+            self.crop_height_spin,
+        ):
+            spin.setEnabled(enabled)
+
+    def _update_crop_dimensions(self, crop: CropConfig) -> None:
+        self.crop_dimensions_label.setText(f"Output: {crop.width} x {crop.height}")
 
     def _start_queue(self) -> None:
         if self._active_thread is not None:
@@ -285,6 +414,7 @@ class MainWindow(QMainWindow):
             QMainWindow, QWidget {
                 background: #202326;
                 color: #e5e7eb;
+                font-family: "Segoe UI", Arial, sans-serif;
                 font-size: 12px;
             }
             QLabel#panelTitle {
