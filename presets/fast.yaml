@@ -1,0 +1,24 @@
+mode: fast
+pixel:
+  scale: 4
+palette:
+  strategy: per_frame
+  colors: 32
+  sample_frames: 12
+image:
+  brightness: 1.0
+  sharpness: 1.1
+  saturation: 1.08
+effects:
+  crt: subtle
+  vhs: light
+  chroma_offset: 1
+  noise_amount: 0.012
+performance:
+  workers: auto
+  preview_seconds: 8
+output:
+  keep_audio: true
+  codec: libx264
+  overwrite: false
+  audio_failure: stop

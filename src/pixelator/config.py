@@ -1,0 +1,144 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from pixelator.errors import ConfigError
+
+
+@dataclass(frozen=True)
+class PixelConfig:
+    scale: int = 4
+    target_width: int | None = None
+
+
+@dataclass(frozen=True)
+class PaletteConfig:
+    strategy: str = "global_sampled"
+    colors: int = 32
+    sample_frames: int = 48
+
+
+@dataclass(frozen=True)
+class ImageConfig:
+    brightness: float = 1.0
+    sharpness: float = 1.2
+    saturation: float = 1.1
+
+
+@dataclass(frozen=True)
+class EffectsConfig:
+    crt: str = "subtle"
+    vhs: str = "light"
+    chroma_offset: int = 1
+    noise_amount: float = 0.018
+
+
+@dataclass(frozen=True)
+class PerformanceConfig:
+    workers: str | int = "auto"
+    preview_seconds: float | None = None
+
+
+@dataclass(frozen=True)
+class OutputConfig:
+    keep_audio: bool = True
+    codec: str = "libx264"
+    overwrite: bool = False
+    audio_failure: str = "stop"
+
+
+@dataclass(frozen=True)
+class RenderConfig:
+    mode: str = "stable"
+    pixel: PixelConfig = field(default_factory=PixelConfig)
+    palette: PaletteConfig = field(default_factory=PaletteConfig)
+    image: ImageConfig = field(default_factory=ImageConfig)
+    effects: EffectsConfig = field(default_factory=EffectsConfig)
+    performance: PerformanceConfig = field(default_factory=PerformanceConfig)
+    output: OutputConfig = field(default_factory=OutputConfig)
+
+
+def load_config(path: str | Path) -> RenderConfig:
+    config_path = Path(path)
+    try:
+        raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except OSError as exc:
+        raise ConfigError(f"Could not read config file: {config_path}") from exc
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"Could not parse YAML config: {config_path}") from exc
+    config = config_from_dict(raw)
+    validate_config(config)
+    return config
+
+
+def config_from_dict(raw: dict[str, Any]) -> RenderConfig:
+    return RenderConfig(
+        mode=raw.get("mode", "stable"),
+        pixel=_nested(PixelConfig, raw.get("pixel", {})),
+        palette=_nested(PaletteConfig, raw.get("palette", {})),
+        image=_nested(ImageConfig, raw.get("image", {})),
+        effects=_nested(EffectsConfig, _normalize_effect_modes(raw.get("effects", {}))),
+        performance=_nested(PerformanceConfig, raw.get("performance", {})),
+        output=_nested(OutputConfig, raw.get("output", {})),
+    )
+
+
+def merge_cli_overrides(config: RenderConfig, overrides: dict[str, Any]) -> RenderConfig:
+    result = config
+    for key, value in overrides.items():
+        if value is None:
+            continue
+        parts = key.split(".")
+        if len(parts) == 1:
+            result = replace(result, **{parts[0]: value})
+            continue
+        if len(parts) != 2:
+            raise ConfigError(f"Unsupported override path: {key}")
+        section_name, field_name = parts
+        section = getattr(result, section_name)
+        result = replace(result, **{section_name: replace(section, **{field_name: value})})
+    validate_config(result)
+    return result
+
+
+def validate_config(config: RenderConfig) -> None:
+    if config.mode not in {"fast", "stable"}:
+        raise ConfigError("mode must be 'fast' or 'stable'")
+    if config.pixel.scale < 1:
+        raise ConfigError("pixel.scale must be at least 1")
+    if config.pixel.target_width is not None and config.pixel.target_width < 16:
+        raise ConfigError("pixel.target_width must be at least 16 when set")
+    if not 2 <= config.palette.colors <= 256:
+        raise ConfigError("palette.colors must be between 2 and 256")
+    if config.palette.sample_frames < 1:
+        raise ConfigError("palette.sample_frames must be at least 1")
+    if config.effects.crt not in {"off", "subtle"}:
+        raise ConfigError("effects.crt must be 'off' or 'subtle'")
+    if config.effects.vhs not in {"off", "light"}:
+        raise ConfigError("effects.vhs must be 'off' or 'light'")
+    if config.output.audio_failure not in {"stop", "continue"}:
+        raise ConfigError("output.audio_failure must be 'stop' or 'continue'")
+
+
+def _nested(cls: type[Any], raw: dict[str, Any]) -> Any:
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{cls.__name__} expects a mapping")
+    try:
+        return cls(**raw)
+    except TypeError as exc:
+        raise ConfigError(f"{cls.__name__} contains an unsupported field") from exc
+
+
+def _normalize_effect_modes(raw: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ConfigError("EffectsConfig expects a mapping")
+    normalized = dict(raw)
+    for key in ("crt", "vhs"):
+        value = normalized.get(key)
+        if value is False:
+            normalized[key] = "off"
+    return normalized

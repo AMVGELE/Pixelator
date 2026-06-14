@@ -1,0 +1,24 @@
+mode: stable
+pixel:
+  scale: 4
+palette:
+  strategy: global_sampled
+  colors: 32
+  sample_frames: 48
+image:
+  brightness: 1.0
+  sharpness: 1.2
+  saturation: 1.1
+effects:
+  crt: subtle
+  vhs: light
+  chroma_offset: 1
+  noise_amount: 0.018
+performance:
+  workers: auto
+  preview_seconds: null
+output:
+  keep_audio: true
+  codec: libx264
+  overwrite: false
+  audio_failure: stop
