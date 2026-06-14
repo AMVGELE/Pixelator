@@ -6,9 +6,10 @@ It should be updated throughout development.
 ## Current Status
 
 - Phase: v0.1 implemented
-- Active milestone: Milestone 4 - Reliability Pass
+- Active milestone: GUI-0 - Desktop GUI Design
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
+- GUI design spec: `docs/superpowers/specs/2026-06-14-desktop-gui-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-06-14-pixelator-v0.1-implementation.md`
 
 ## Decisions
@@ -19,6 +20,9 @@ It should be updated throughout development.
 - Treat PAC Pixel Art Converter as an algorithm reference, not as source architecture.
 - Use `docs/PROGRESS.md` as the live development tracker.
 - Defer Aseprite or sprite-sheet round-tripping to v0.2.
+- Build the next GUI milestone as a PySide6 desktop application with a restrained
+  video-processing workstation style.
+- Include draggable crop selection and source time trimming in the first GUI scope.
 
 ## Milestone Checklist
 
@@ -65,6 +69,15 @@ It should be updated throughout development.
 - [x] Improve user-facing errors.
 - [x] Update usage docs.
 
+### GUI-0 - Desktop GUI Design
+
+- [x] Confirm desktop window GUI direction.
+- [x] Confirm restrained video-processing workstation visual direction.
+- [x] Include queue, preview, draggable crop selection, and source time trimming in scope.
+- [x] Add GUI design spec.
+- [ ] Review GUI design spec with user.
+- [ ] Create GUI implementation plan after design approval.
+
 ## Validation Log
 
 - Implementation plan self-review completed on 2026-06-14.
@@ -86,6 +99,7 @@ It should be updated throughout development.
 - `pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --overwrite --no-audio` passed.
 - Output probe passed for `outputs/sample.mp4`, `outputs/sample-fast.mp4`, and `outputs/sample-stable.mp4` at `96x64 @ 12fps`.
 - Audio preservation probe passed for `outputs/sample-audio-fast.mp4`; FFmpeg reported an AAC audio stream in the rendered output.
+- Desktop GUI design started on 2026-06-14.
 
 ## Blockers
 
