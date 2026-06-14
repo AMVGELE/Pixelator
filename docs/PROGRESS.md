@@ -5,7 +5,7 @@ It should be updated throughout development.
 
 ## Current Status
 
-- Phase: v0.1 implemented
+- Phase: GUI implemented
 - Active milestone: GUI-5 - Packaging And Polish
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
@@ -111,11 +111,11 @@ It should be updated throughout development.
 
 ### GUI-5 - Packaging And Polish
 
-- [ ] Document GUI launch and usage.
-- [ ] Run full automated tests.
-- [ ] Verify CLI crop and trim against the Chinese-path test video.
-- [ ] Verify GUI launch and manual render.
-- [ ] Commit and push final GUI milestone.
+- [x] Document GUI launch and usage.
+- [x] Run full automated tests.
+- [x] Verify CLI crop and trim against the Chinese-path test video.
+- [x] Verify GUI launch and manual render.
+- [x] Commit and push final GUI milestone.
 
 ## Validation Log
 
@@ -155,6 +155,11 @@ It should be updated throughout development.
 - Offscreen GUI queue render completed for `D:\GameJamTools\章鱼哥.mp4` with crop `120,180,360,360`, trim `0.0,1.0`, mode `fast`, pixel scale `12`, colors `12`.
 - Latest offscreen GUI output probe reported `360x360 @ 30fps`, duration `1.0s`.
 - `.\.venv\Scripts\python.exe -m pytest -q` passed with 46 tests after adding preview, crop, trim, queue worker, macro-block preservation, and linear-light downsampling.
+- QtTest offscreen drag simulation changed preview crop to `x=357, y=268, width=643, height=232`.
+- `.\.venv\Scripts\pixelator.exe $env:PIXELATOR_TEST_VIDEO --mode fast --pixel-scale 8 --colors 16 --crop 80,120,560,720 --trim 1.0,4.0 --out outputs\gui-pipeline-check.mp4 --overwrite` passed using `D:\GameJamTools\章鱼哥.mp4` as the source path.
+- `outputs\gui-pipeline-check.mp4` probed as `560x720 @ 30fps`, duration `3.0s`.
+- FFmpeg stream probe reported H.264 video and AAC stereo audio in `outputs\gui-pipeline-check.mp4`.
+- `.venv\Scripts\pixelator-gui.exe` exists after editable install; launching it enters the Qt event loop as expected.
 
 ## Blockers
 
