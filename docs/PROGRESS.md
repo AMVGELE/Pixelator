@@ -37,16 +37,16 @@ It should be updated throughout development.
 
 - [x] Add project skeleton.
 - [ ] Add CLI entry point.
-- [ ] Probe input video metadata.
-- [ ] Decode frames.
+- [x] Probe input video metadata.
+- [x] Decode frames.
 - [x] Apply basic pixelation.
-- [ ] Encode output video.
-- [ ] Preserve source audio.
+- [x] Encode output video.
+- [x] Preserve source audio.
 
 ### Milestone 2 - Fast And Stable Modes
 
-- [ ] Add `fast` strategy.
-- [ ] Add `stable` strategy.
+- [x] Add `fast` strategy.
+- [x] Add `stable` strategy.
 - [x] Add global sampled palette support.
 - [x] Add preset configs.
 - [ ] Add comparison workflow.
@@ -75,6 +75,8 @@ It should be updated throughout development.
 - `py -3.11 -m pytest tests/test_palette.py -v` passed.
 - `py -3.11 -m pytest tests/test_effects.py -v` passed.
 - `py -3.11 -m pytest tests/test_video.py -v` passed.
+- `py -3.11 -m pytest tests/test_pipeline.py -v` passed.
+- `py -3.11 -m pytest -v` passed with 22 tests.
 
 ## Blockers
 
