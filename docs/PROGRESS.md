@@ -53,10 +53,10 @@ It should be updated throughout development.
 
 ### Milestone 3 - Effects And Presets
 
-- [ ] Add CRT scanline effect.
-- [ ] Add light VHS noise effect.
-- [ ] Add chroma offset or color bleed effect.
-- [ ] Make effects optional and subtle by default.
+- [x] Add CRT scanline effect.
+- [x] Add light VHS noise effect.
+- [x] Add chroma offset or color bleed effect.
+- [x] Make effects optional and subtle by default.
 
 ### Milestone 4 - Reliability Pass
 
@@ -73,6 +73,7 @@ It should be updated throughout development.
 - `py -3.11 -m pytest tests/test_config.py -v` passed.
 - `py -3.11 -m pytest tests/test_image_ops.py -v` passed.
 - `py -3.11 -m pytest tests/test_palette.py -v` passed.
+- `py -3.11 -m pytest tests/test_effects.py -v` passed.
 
 ## Blockers
 
