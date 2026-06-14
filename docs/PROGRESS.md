@@ -6,7 +6,7 @@ It should be updated throughout development.
 ## Current Status
 
 - Phase: GUI implemented
-- Active milestone: GUI-6 - Timeline Numeric Crop And Portable Package
+- Active milestone: GUI maintenance - Crop Drag Responsiveness
 - Repository: https://github.com/AMVGELE/Pixelator.git
 - Design spec: `docs/superpowers/specs/2026-06-14-pixelator-v0.1-design.md`
 - GUI design spec: `docs/superpowers/specs/2026-06-14-desktop-gui-design.md`
@@ -128,6 +128,12 @@ It should be updated throughout development.
 - [x] Add Windows portable packaging script.
 - [x] Build and smoke-check a local Windows portable package.
 
+### GUI Maintenance - Crop Drag Responsiveness
+
+- [x] Identify crop drag lag root cause: every crop update refreshed the queue list.
+- [x] Avoid queue refresh and preview-frame reload while dragging the crop rectangle.
+- [x] Keep crop model updates and output width/height display synchronized during drag.
+
 ## Validation Log
 
 - Implementation plan self-review completed on 2026-06-14.
@@ -196,6 +202,12 @@ It should be updated throughout development.
 - `.\.venv\Scripts\python.exe -m pytest tests\test_gui_main_window.py tests\test_gui_models.py -v` passed with 12 tests after the requeue fix.
 - `.\.venv\Scripts\python.exe -m pytest -q` passed with 59 tests and 8 Pillow deprecation warnings after the requeue fix.
 - `.\scripts\package_windows.ps1` rebuilt `D:\GameJamTools\Pixelator\dist\Pixelator\Pixelator.exe` after the requeue fix.
+- Packaged GUI smoke check passed with `QT_QPA_PLATFORM=offscreen`; the rebuilt `Pixelator.exe` stayed alive for 3 seconds and was stopped by PID.
+- Crop drag lag root cause found on 2026-06-15: `_on_crop_changed()` refreshed the queue list on every mouse move, which could reload the selected preview frame.
+- Added regression coverage to ensure crop updates do not trigger another `extract_frame()` call.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_gui_main_window.py tests\test_gui_models.py tests\test_gui_preview.py -v` passed with 18 tests after the crop drag responsiveness fix.
+- `.\.venv\Scripts\python.exe -m pytest -q` passed with 60 tests and 8 Pillow deprecation warnings after the crop drag responsiveness fix.
+- `.\scripts\package_windows.ps1` rebuilt `D:\GameJamTools\Pixelator\dist\Pixelator\Pixelator.exe` after the crop drag responsiveness fix.
 - Packaged GUI smoke check passed with `QT_QPA_PLATFORM=offscreen`; the rebuilt `Pixelator.exe` stayed alive for 3 seconds and was stopped by PID.
 
 ## Blockers
