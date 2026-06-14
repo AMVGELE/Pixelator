@@ -21,6 +21,17 @@ def test_pixelate_frame_preserves_original_dimensions():
     assert result.mode == "RGB"
 
 
+def test_pixelate_frame_downsamples_in_linear_light():
+    image = Image.new("RGB", (4, 4))
+    for y in range(4):
+        for x in range(4):
+            image.putpixel((x, y), (255, 0, 0) if (x + y) % 2 == 0 else (0, 255, 0))
+
+    result = pixelate_frame(image, PixelConfig(scale=4))
+
+    assert result.getpixel((0, 0)) == (188, 188, 0)
+
+
 def test_adjust_frame_changes_saturation_without_changing_size():
     image = Image.new("RGB", (8, 8), (120, 80, 40))
 
