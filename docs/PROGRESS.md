@@ -48,7 +48,7 @@ It should be updated throughout development.
 - [ ] Add `fast` strategy.
 - [ ] Add `stable` strategy.
 - [ ] Add global sampled palette support.
-- [ ] Add preset configs.
+- [x] Add preset configs.
 - [ ] Add comparison workflow.
 
 ### Milestone 3 - Effects And Presets
@@ -70,6 +70,7 @@ It should be updated throughout development.
 - Implementation plan self-review completed on 2026-06-14.
 - Implementation plan approved by user on 2026-06-14.
 - `py -3.11 -m pytest tests/test_package.py -v` passed.
+- `py -3.11 -m pytest tests/test_config.py -v` passed.
 
 ## Blockers
 
