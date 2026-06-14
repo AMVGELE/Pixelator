@@ -225,7 +225,6 @@ class MainWindow(QMainWindow):
         job_id = self.queue_panel.selected_job_id()
         if job_id:
             self.queue.update(job_id, crop=crop)
-            self._refresh_queue()
 
     def _on_trim_changed(self) -> None:
         if self._loading_job:

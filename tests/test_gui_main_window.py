@@ -139,6 +139,34 @@ def test_numeric_crop_controls_snap_to_even_output_dimensions(monkeypatch, tmp_p
     window.close()
 
 
+def test_crop_drag_update_does_not_reload_preview(monkeypatch, tmp_path: Path, qapp):
+    source = tmp_path / "clip.mp4"
+    source.write_bytes(b"fake")
+    requested_seconds = []
+
+    monkeypatch.setattr(
+        "pixelator.gui.main_window.probe_video",
+        lambda path: VideoMetadata(width=64, height=48, fps=10.0, duration=10.0),
+    )
+
+    def fake_extract_frame(path, seconds=0.0):
+        requested_seconds.append(seconds)
+        return Image.new("RGB", (64, 48), (0, 0, 0))
+
+    monkeypatch.setattr("pixelator.gui.main_window.extract_frame", fake_extract_frame)
+
+    window = MainWindow()
+    window.add_video_paths([source])
+    assert requested_seconds == [0.0]
+
+    window._on_crop_changed(CropConfig(x=4, y=6, width=24, height=18))
+
+    assert requested_seconds == [0.0]
+    assert window.queue.jobs[0].crop == CropConfig(x=4, y=6, width=24, height=18)
+    assert window.crop_dimensions_label.text() == "Output: 24 x 18"
+    window.close()
+
+
 def test_start_requeues_selected_completed_job(monkeypatch, tmp_path: Path, qapp):
     source = tmp_path / "clip.mp4"
     source.write_bytes(b"fake")
