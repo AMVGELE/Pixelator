@@ -32,6 +32,10 @@ def ensure_output_path(path: str | Path, overwrite: bool) -> Path:
     return output
 
 
+def is_gif_path(path: str | Path) -> bool:
+    return Path(path).suffix.lower() == ".gif"
+
+
 def probe_video(path: str | Path) -> VideoMetadata:
     reader = imageio_ffmpeg.read_frames(str(path), pix_fmt="rgb24")
     try:
@@ -84,6 +88,33 @@ def write_video(frames: Iterable[Image.Image], output: str | Path, metadata: Vid
         raise VideoError(message) from exc
     finally:
         writer.close()
+
+
+def write_gif(frames: Iterable[Image.Image], output: str | Path, metadata: VideoMetadata) -> None:
+    duration_ms = max(1, round(1000 / metadata.fps)) if metadata.fps > 0 else 100
+    prepared_frames = [
+        frame.convert("RGB").convert("P", palette=Image.Palette.ADAPTIVE, colors=256)
+        for frame in frames
+    ]
+    if not prepared_frames:
+        raise VideoError(f"Could not encode GIF: {output}: no frames to write")
+    first, rest = prepared_frames[0], prepared_frames[1:]
+    try:
+        first.save(
+            output,
+            save_all=True,
+            append_images=rest,
+            duration=duration_ms,
+            loop=0,
+            disposal=2,
+            optimize=False,
+        )
+    except Exception as exc:
+        detail = str(exc).strip()
+        message = f"Could not encode GIF: {output}"
+        if detail:
+            message = f"{message}: {detail}"
+        raise VideoError(message) from exc
 
 
 def frame_window(

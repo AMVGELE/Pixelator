@@ -1,7 +1,7 @@
 from PIL import Image
 
-from pixelator.config import CropConfig, RenderConfig, TrimConfig
-from pixelator.pipeline import prepare_source_frames, process_frames
+from pixelator.config import CropConfig, EffectsConfig, OutputConfig, PixelConfig, RenderConfig, TrimConfig
+from pixelator.pipeline import prepare_source_frames, process_frames, render_video
 from pixelator.video import VideoMetadata
 
 
@@ -55,6 +55,17 @@ def test_prepare_source_frames_makes_crop_dimensions_even_for_h264():
     assert prepared[0].size == (2, 2)
 
 
+def test_prepare_source_frames_can_preserve_odd_dimensions_for_gif():
+    frames = [Image.new("RGB", (10, 8), (255, 0, 0))]
+    config = RenderConfig(crop=CropConfig(x=5, y=4, width=3, height=3))
+    metadata = VideoMetadata(width=10, height=8, fps=24.0)
+
+    prepared, prepared_metadata = prepare_source_frames(frames, config, metadata, encoder_safe=False)
+
+    assert prepared_metadata.size == (3, 3)
+    assert prepared[0].size == (3, 3)
+
+
 def test_prepare_source_frames_applies_trim_by_frame_range():
     frames = [Image.new("RGB", (4, 4), (index, 0, 0)) for index in range(10)]
     config = RenderConfig(trim=TrimConfig(start=0.2, end=0.5))
@@ -64,3 +75,69 @@ def test_prepare_source_frames_applies_trim_by_frame_range():
 
     assert prepared_metadata.duration == 0.3
     assert [frame.getpixel((0, 0))[0] for frame in prepared] == [2, 3, 4]
+
+
+def test_render_video_writes_real_gif_and_skips_audio_mux(monkeypatch, tmp_path):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"fake")
+    output = tmp_path / "pixelated.gif"
+    frames = [
+        Image.new("RGB", (3, 3), (255, 0, 0)),
+        Image.new("RGB", (3, 3), (0, 0, 255)),
+    ]
+
+    monkeypatch.setattr(
+        "pixelator.pipeline.probe_video",
+        lambda path: VideoMetadata(width=3, height=3, fps=12.0, duration=2 / 12.0),
+    )
+    monkeypatch.setattr("pixelator.pipeline.iter_frames", lambda path: iter(frames))
+    monkeypatch.setattr(
+        "pixelator.pipeline.mux_audio",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("GIF output must not mux audio")),
+    )
+
+    result = render_video(
+        source,
+        output,
+        RenderConfig(
+            mode="fast",
+            pixel=PixelConfig(scale=1),
+            effects=EffectsConfig(crt="off", vhs="off"),
+            output=OutputConfig(keep_audio=True, overwrite=True),
+        ),
+    )
+
+    assert result == output
+    with Image.open(output) as gif:
+        assert gif.format == "GIF"
+        assert gif.size == (3, 3)
+        assert gif.n_frames == 2
+
+
+def test_render_gif_input_to_video_skips_audio_mux(monkeypatch, tmp_path):
+    source = tmp_path / "source.gif"
+    source.write_bytes(b"fake")
+    output = tmp_path / "pixelated.mp4"
+    frames = [Image.new("RGB", (4, 4), (255, 0, 0))]
+    calls = {}
+
+    monkeypatch.setattr(
+        "pixelator.pipeline.probe_video",
+        lambda path: VideoMetadata(width=4, height=4, fps=12.0, duration=1 / 12.0),
+    )
+    monkeypatch.setattr("pixelator.pipeline.iter_frames", lambda path: iter(frames))
+
+    def fake_write_video(processed, silent_output, metadata, codec):
+        calls["write_video"] = (list(processed), silent_output, metadata, codec)
+        silent_output.write_bytes(b"video")
+
+    monkeypatch.setattr("pixelator.pipeline.write_video", fake_write_video)
+    monkeypatch.setattr(
+        "pixelator.pipeline.mux_audio",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("GIF input has no audio to mux")),
+    )
+
+    render_video(source, output, RenderConfig(output=OutputConfig(keep_audio=True, overwrite=True)))
+
+    assert output.read_bytes() == b"video"
+    assert "write_video" in calls

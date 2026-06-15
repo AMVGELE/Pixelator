@@ -50,6 +50,9 @@ class SettingsPanel(QWidget):
         self.overwrite_check = QCheckBox()
         self.overwrite_check.setChecked(True)
 
+        self.output_format_combo = QComboBox()
+        self.output_format_combo.addItems(["MP4", "GIF"])
+
         self.output_folder_edit = QLineEdit(str(Path("outputs")))
         self.output_browse_button = QPushButton("Browse")
         self.output_browse_button.clicked.connect(self._choose_output_folder)
@@ -68,6 +71,7 @@ class SettingsPanel(QWidget):
         form.addRow("VHS", self.vhs_combo)
         form.addRow("Keep audio", self.keep_audio_check)
         form.addRow("Overwrite", self.overwrite_check)
+        form.addRow("Output format", self.output_format_combo)
 
         output_row = QHBoxLayout()
         output_row.addWidget(self.output_folder_edit, 1)
@@ -91,6 +95,7 @@ class SettingsPanel(QWidget):
             vhs=self.vhs_combo.currentText(),
             keep_audio=self.keep_audio_check.isChecked(),
             overwrite=self.overwrite_check.isChecked(),
+            output_format=self.output_format_combo.currentText().lower(),
         )
 
     def output_folder(self) -> Path:

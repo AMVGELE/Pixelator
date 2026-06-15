@@ -1,6 +1,6 @@
 # Pixelator
 
-Pixelator converts source videos into a light pixel-art video style.
+Pixelator converts source videos and GIFs into a light pixel-art style.
 
 ## Install
 
@@ -14,10 +14,15 @@ python -m pip install -e ".[dev]"
 pixelator input.mp4 --mode fast --out output-fast.mp4
 pixelator input.mp4 --mode stable --out output-stable.mp4
 pixelator input.mp4 --config presets/stable.yaml --out output-stable.mp4
+pixelator input.gif --mode fast --out output-from-gif.mp4
+pixelator input.mp4 --mode fast --out output.gif --no-audio
 ```
 
 `fast` mode is for quick parameter previews. `stable` mode is for final renders with
 reduced temporal color flicker.
+
+Output format is inferred from `--out`. Use `.mp4` for video output or `.gif`
+for animated GIF output. GIF output does not include audio.
 
 ## Verification
 
@@ -27,6 +32,8 @@ After installation, run:
 python -m pytest -v
 pixelator outputs/sample.mp4 --mode fast --out outputs/sample-fast.mp4 --overwrite --no-audio
 pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --overwrite --no-audio
+pixelator outputs/sample.gif --mode fast --out outputs/sample-gif-input.mp4 --overwrite --no-audio
+pixelator outputs/sample.mp4 --mode fast --out outputs/sample-pixelated.gif --overwrite --no-audio
 ```
 
 Use `fast` while tuning parameters, then render `stable` for final output.
@@ -48,8 +55,11 @@ pixelator-gui
 ```
 
 The desktop GUI provides a restrained workstation layout with a queue panel, preview
-area, render settings, trim controls, crop controls, and logs. It uses the same
-Pixelator pipeline as the CLI.
+area, render settings, trim controls, crop controls, and logs. It accepts common
+video files and GIFs, and it uses the same Pixelator pipeline as the CLI.
+
+Use the output format setting to choose MP4 or GIF for queued renders. MP4 remains
+the default. GIF output is silent because the GIF format has no audio track.
 
 The timeline sits above the preview. Moving the scrubber refreshes the displayed
 source frame without changing the trim range. Crop can be adjusted either by

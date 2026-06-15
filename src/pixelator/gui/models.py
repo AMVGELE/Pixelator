@@ -57,6 +57,7 @@ class RenderSettings:
     vhs: str = "light"
     keep_audio: bool = True
     overwrite: bool = False
+    output_format: str = "mp4"
     crop: CropConfig | None = None
     trim: TrimConfig | None = None
 
