@@ -39,10 +39,10 @@ class SettingsPanel(QWidget):
         self.saturation_spin = self._factor_spin(1.1)
 
         self.crt_combo = QComboBox()
-        self.crt_combo.addItems(["subtle", "off"])
+        self.crt_combo.addItems(["off", "subtle"])
 
         self.vhs_combo = QComboBox()
-        self.vhs_combo.addItems(["light", "off"])
+        self.vhs_combo.addItems(["off", "light"])
 
         self.keep_audio_check = QCheckBox()
         self.keep_audio_check.setChecked(True)
@@ -57,7 +57,7 @@ class SettingsPanel(QWidget):
         self.output_browse_button = QPushButton("Browse")
         self.output_browse_button.clicked.connect(self._choose_output_folder)
 
-        title = QLabel("Settings")
+        title = QLabel("Render Settings")
         title.setObjectName("panelTitle")
 
         form = QFormLayout()

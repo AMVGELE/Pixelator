@@ -218,3 +218,59 @@ def test_output_path_uses_selected_output_format(tmp_path: Path, qapp):
 
     assert window._output_path_for_job(job) == tmp_path / "clip-pixelated.gif"
     window.close()
+
+
+def test_right_side_splits_render_and_palette_tabs(qapp):
+    window = MainWindow()
+
+    assert window.right_tabs.count() == 2
+    assert window.right_tabs.tabText(0) == "Render"
+    assert window.right_tabs.tabText(1) == "Palette"
+    window.close()
+
+
+def test_main_window_carries_custom_palette_to_render_settings(tmp_path: Path, qapp):
+    source = tmp_path / "clip.mp4"
+    job = VideoJob(source_path=source)
+    window = MainWindow()
+    window.palette_panel.set_colors(["#000000", "#ffcc00"])
+
+    settings = window._settings_for_job(job)
+
+    assert settings.custom_palette == ["#000000", "#ffcc00"]
+    assert settings.to_config().palette.strategy == "custom"
+    window.close()
+
+
+def test_main_window_extracts_palette_from_current_preview_frame(monkeypatch, tmp_path: Path, qapp):
+    source = tmp_path / "clip.mp4"
+    source.write_bytes(b"fake")
+    frame = Image.new("RGB", (6, 1))
+    frame.putdata([(255, 0, 0)] * 4 + [(0, 255, 0)] * 2)
+
+    monkeypatch.setattr(
+        "pixelator.gui.main_window.probe_video",
+        lambda path: VideoMetadata(width=6, height=1, fps=10.0, duration=1.0),
+    )
+    monkeypatch.setattr("pixelator.gui.main_window.extract_frame", lambda path, seconds=0.0: frame)
+
+    window = MainWindow()
+    window.add_video_paths([source])
+    window._extract_palette_from_current_frame(2)
+
+    assert window.palette_panel.colors() == ["#ff0000", "#00ff00"]
+    settings = window._settings_for_job(window.queue.jobs[0])
+    assert settings.custom_palette == ["#ff0000", "#00ff00"]
+    assert settings.source_palette == ["#ff0000", "#00ff00"]
+    assert settings.to_config().palette.strategy == "auto_match"
+    window.close()
+
+
+def test_main_window_current_frame_extract_without_preview_does_not_change_palette(qapp):
+    window = MainWindow()
+
+    window._extract_palette_from_current_frame(2)
+
+    assert window.palette_panel.colors() == []
+    assert window.palette_panel.status_label.text() == "No current frame to extract"
+    window.close()
