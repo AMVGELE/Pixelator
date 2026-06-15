@@ -172,7 +172,7 @@ class MainWindow(QMainWindow):
             self,
             "Add videos",
             "",
-            "Video files (*.mp4 *.mov *.mkv *.avi);;All files (*.*)",
+            "Media files (*.mp4 *.mov *.mkv *.avi *.gif);;Video files (*.mp4 *.mov *.mkv *.avi);;GIF files (*.gif);;All files (*.*)",
         )
         if paths:
             self.add_video_paths(paths)
@@ -376,7 +376,8 @@ class MainWindow(QMainWindow):
     def _output_path_for_job(self, job: VideoJob) -> Path:
         output_dir = self.settings_panel.output_folder()
         output_dir.mkdir(parents=True, exist_ok=True)
-        return output_dir / f"{job.source_path.stem}-pixelated.mp4"
+        extension = self.settings_panel.settings().output_format
+        return output_dir / f"{job.source_path.stem}-pixelated.{extension}"
 
     def _on_worker_progress(self, job_id: str, progress: int) -> None:
         self.queue.mark_progress(job_id, progress)

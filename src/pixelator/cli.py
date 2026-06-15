@@ -36,10 +36,10 @@ def _parse_trim(value: str) -> TrimConfig:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pixelator",
-        description="Convert videos into a light pixel-art style.",
+        description="Convert videos and GIFs into a light pixel-art style.",
     )
-    parser.add_argument("input", type=Path, help="Input video path.")
-    parser.add_argument("--out", type=Path, required=True, help="Output video path.")
+    parser.add_argument("input", type=Path, help="Input video or GIF path.")
+    parser.add_argument("--out", type=Path, required=True, help="Output video or GIF path.")
     parser.add_argument("--config", type=Path, help="YAML config path.")
     parser.add_argument("--mode", choices=["fast", "stable"], help="Render mode.")
     parser.add_argument("--pixel-scale", type=int, help="Pixel scale factor.")

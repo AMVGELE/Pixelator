@@ -88,3 +88,9 @@ def test_render_settings_create_config_with_crop_and_trim():
     assert config.output.overwrite is True
     assert config.crop == settings.crop
     assert config.trim == settings.trim
+
+
+def test_render_settings_default_output_format_is_mp4():
+    settings = RenderSettings()
+
+    assert settings.output_format == "mp4"

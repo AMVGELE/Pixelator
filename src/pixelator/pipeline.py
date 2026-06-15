@@ -16,9 +16,11 @@ from pixelator.video import (
     ensure_output_path,
     frame_window,
     iter_frames,
+    is_gif_path,
     mux_audio,
     probe_video,
     sample_frames,
+    write_gif,
     write_video,
 )
 
@@ -27,6 +29,7 @@ def prepare_source_frames(
     frames: Iterable[Image.Image],
     config: RenderConfig,
     metadata: VideoMetadata,
+    encoder_safe: bool = True,
 ) -> tuple[list[Image.Image], VideoMetadata]:
     frame_list = list(frames)
     if config.trim is not None:
@@ -48,7 +51,8 @@ def prepare_source_frames(
             raise VideoError("Crop rectangle is outside the source frame")
         frame_list = [frame.crop((left, upper, right, lower)) for frame in frame_list]
         metadata = VideoMetadata(width=right - left, height=lower - upper, fps=metadata.fps, duration=metadata.duration)
-    frame_list, metadata = _make_frames_encoder_safe(frame_list, metadata)
+    if encoder_safe:
+        frame_list, metadata = _make_frames_encoder_safe(frame_list, metadata)
     return frame_list, metadata
 
 
@@ -103,15 +107,22 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
         raise VideoError(f"Input video does not exist: {input_file}")
 
     final_output = ensure_output_path(output_path, overwrite=config.output.overwrite)
+    output_is_gif = is_gif_path(final_output)
+    input_is_gif = is_gif_path(input_file)
     metadata = probe_video(input_file)
     frames = list(iter_frames(input_file))
-    frames, metadata = prepare_source_frames(frames, config, metadata)
+    frames, metadata = prepare_source_frames(frames, config, metadata, encoder_safe=not output_is_gif)
+
+    if output_is_gif:
+        processed = process_frames(frames, config, metadata)
+        write_gif(processed, final_output, metadata)
+        return final_output
 
     with TemporaryDirectory(prefix="pixelator-") as temp_dir:
         silent_output = Path(temp_dir) / f"{final_output.stem}.silent.mp4"
         processed = process_frames(frames, config, metadata)
         write_video(processed, silent_output, metadata, codec=config.output.codec)
-        if config.output.keep_audio:
+        if config.output.keep_audio and not input_is_gif:
             try:
                 trim_start = config.trim.start if config.trim is not None else 0.0
                 trim_duration = metadata.duration if config.trim is not None else None

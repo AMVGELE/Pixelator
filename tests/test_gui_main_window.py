@@ -188,3 +188,33 @@ def test_start_requeues_selected_completed_job(monkeypatch, tmp_path: Path, qapp
     assert window.queue.jobs[0].progress == 0
     assert window.queue.jobs[0].output_path is None
     window.close()
+
+
+def test_file_chooser_includes_gif_filter(monkeypatch, qapp):
+    captured = {}
+    window = MainWindow()
+
+    def fake_get_open_file_names(parent, title, directory, file_filter):
+        captured["filter"] = file_filter
+        return [], ""
+
+    monkeypatch.setattr("pixelator.gui.main_window.QFileDialog.getOpenFileNames", fake_get_open_file_names)
+
+    window._choose_files()
+
+    assert "*.gif" in captured["filter"]
+    window.close()
+
+
+def test_output_path_uses_selected_output_format(tmp_path: Path, qapp):
+    source = tmp_path / "clip.mp4"
+    job = VideoJob(source_path=source)
+    window = MainWindow()
+    window.settings_panel.output_folder_edit.setText(str(tmp_path))
+
+    assert window._output_path_for_job(job) == tmp_path / "clip-pixelated.mp4"
+
+    window.settings_panel.output_format_combo.setCurrentText("GIF")
+
+    assert window._output_path_for_job(job) == tmp_path / "clip-pixelated.gif"
+    window.close()
