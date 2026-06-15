@@ -19,6 +19,8 @@ def test_default_config_uses_stable_mode():
     assert config.mode == "stable"
     assert config.pixel.scale == 4
     assert config.palette.colors == 32
+    assert config.effects.crt == "off"
+    assert config.effects.vhs == "off"
     assert config.output.keep_audio is True
 
 
@@ -45,6 +47,50 @@ effects:
     assert config.palette.colors == 16
     assert config.effects.crt == "off"
     assert config.effects.vhs == "light"
+
+
+def test_load_config_accepts_custom_palette_colors(tmp_path: Path):
+    path = tmp_path / "pixelator.yaml"
+    path.write_text(
+        """
+palette:
+  strategy: custom
+  custom_colors:
+    - "#000000"
+    - "#ffcc00"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(path)
+
+    assert config.palette.strategy == "custom"
+    assert config.palette.custom_colors == ["#000000", "#ffcc00"]
+
+
+def test_load_config_accepts_auto_match_palette_colors(tmp_path: Path):
+    path = tmp_path / "pixelator.yaml"
+    path.write_text(
+        """
+palette:
+  strategy: auto_match
+  match_sort: original
+  source_colors:
+    - "#ff0000"
+    - "#0000ff"
+  custom_colors:
+    - "#00ff00"
+    - "#ffff00"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(path)
+
+    assert config.palette.strategy == "auto_match"
+    assert config.palette.source_colors == ["#ff0000", "#0000ff"]
+    assert config.palette.custom_colors == ["#00ff00", "#ffff00"]
+    assert config.palette.match_sort == "original"
 
 
 def test_cli_overrides_replace_nested_values():
@@ -77,6 +123,71 @@ def test_invalid_palette_size_is_rejected():
     config = config_from_dict({"palette": {"colors": 1}})
 
     with pytest.raises(ConfigError, match="palette.colors"):
+        validate_config(config)
+
+
+def test_custom_palette_requires_at_least_two_colors():
+    config = config_from_dict({"palette": {"strategy": "custom", "custom_colors": ["#000000"]}})
+
+    with pytest.raises(ConfigError, match="custom_colors"):
+        validate_config(config)
+
+
+def test_custom_palette_rejects_invalid_hex():
+    config = config_from_dict({"palette": {"strategy": "custom", "custom_colors": ["#000000", "#fff"]}})
+
+    with pytest.raises(ConfigError, match="#RRGGBB"):
+        validate_config(config)
+
+
+def test_custom_palette_rejects_too_many_colors():
+    config = config_from_dict(
+        {
+            "palette": {
+                "strategy": "custom",
+                "custom_colors": ["#000000", "#ffffff"] * 129,
+            }
+        }
+    )
+
+    with pytest.raises(ConfigError, match="custom_colors"):
+        validate_config(config)
+
+
+def test_source_palette_requires_auto_match_strategy():
+    config = config_from_dict({"palette": {"source_colors": ["#000000", "#ffffff"]}})
+
+    with pytest.raises(ConfigError, match="source_colors"):
+        validate_config(config)
+
+
+def test_auto_match_palette_requires_source_colors():
+    config = config_from_dict(
+        {
+            "palette": {
+                "strategy": "auto_match",
+                "custom_colors": ["#000000", "#ffffff"],
+            }
+        }
+    )
+
+    with pytest.raises(ConfigError, match="source_colors"):
+        validate_config(config)
+
+
+def test_auto_match_rejects_invalid_match_sort():
+    config = config_from_dict(
+        {
+            "palette": {
+                "strategy": "auto_match",
+                "match_sort": "temperature",
+                "source_colors": ["#000000", "#ffffff"],
+                "custom_colors": ["#000000", "#ffffff"],
+            }
+        }
+    )
+
+    with pytest.raises(ConfigError, match="match_sort"):
         validate_config(config)
 
 

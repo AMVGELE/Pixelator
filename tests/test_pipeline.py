@@ -1,6 +1,6 @@
 from PIL import Image
 
-from pixelator.config import CropConfig, EffectsConfig, OutputConfig, PixelConfig, RenderConfig, TrimConfig
+from pixelator.config import CropConfig, EffectsConfig, OutputConfig, PaletteConfig, PixelConfig, RenderConfig, TrimConfig
 from pixelator.pipeline import prepare_source_frames, process_frames, render_video
 from pixelator.video import VideoMetadata
 
@@ -29,6 +29,77 @@ def test_process_frames_stable_uses_shared_palette():
     assert len(result) == 2
     assert result[0].size == (8, 8)
     assert result[1].size == (8, 8)
+
+
+def test_process_frames_custom_palette_overrides_fast_quantization():
+    frames = [Image.linear_gradient("L").resize((16, 16)).convert("RGB")]
+    config = RenderConfig(
+        mode="fast",
+        palette=PaletteConfig(strategy="custom", custom_colors=["#000000", "#ffffff"]),
+        effects=EffectsConfig(crt="off", vhs="off"),
+    )
+    metadata = VideoMetadata(width=16, height=16, fps=24.0)
+
+    result = list(process_frames(frames, config, metadata))
+
+    assert set(result[0].getdata()).issubset({(0, 0, 0), (255, 255, 255)})
+
+
+def test_process_frames_custom_palette_applies_after_effects():
+    frames = [Image.linear_gradient("L").resize((16, 16)).convert("RGB")]
+    config = RenderConfig(
+        mode="stable",
+        palette=PaletteConfig(strategy="custom", custom_colors=["#000000", "#ffffff"]),
+        effects=EffectsConfig(crt="subtle", vhs="light"),
+    )
+    metadata = VideoMetadata(width=16, height=16, fps=24.0)
+
+    result = list(process_frames(frames, config, metadata))
+
+    assert set(result[0].getdata()).issubset({(0, 0, 0), (255, 255, 255)})
+
+
+def test_process_frames_auto_match_palette_applies_in_fast_and_stable_modes():
+    frame = Image.new("RGB", (4, 4))
+    frame.putdata([(250, 0, 0)] * 8 + [(0, 0, 250)] * 8)
+    metadata = VideoMetadata(width=4, height=4, fps=24.0)
+
+    for mode in ("fast", "stable"):
+        config = RenderConfig(
+            mode=mode,
+            pixel=PixelConfig(scale=1),
+            palette=PaletteConfig(
+                strategy="auto_match",
+                source_colors=["#ff0000", "#0000ff"],
+                custom_colors=["#0000cc", "#ff3300"],
+                match_sort="original",
+            ),
+            effects=EffectsConfig(crt="subtle", vhs="light"),
+        )
+
+        result = list(process_frames([frame], config, metadata))
+
+        assert set(result[0].getdata()).issubset({(0, 0, 204), (255, 51, 0)})
+
+
+def test_process_frames_auto_match_uses_direct_render_fallback_for_uncovered_colors():
+    frame = Image.new("RGB", (2, 1))
+    frame.putdata([(240, 240, 240), (34, 34, 40)])
+    config = RenderConfig(
+        mode="fast",
+        pixel=PixelConfig(scale=1),
+        palette=PaletteConfig(
+            strategy="auto_match",
+            source_colors=["#202020", "#303038"],
+            custom_colors=["#000000", "#eeeeee"],
+            match_sort="original",
+        ),
+        effects=EffectsConfig(crt="off", vhs="off"),
+    )
+
+    result = list(process_frames([frame], config, VideoMetadata(width=2, height=1, fps=24.0)))
+
+    assert list(result[0].getdata()) == [(238, 238, 238), (0, 0, 0)]
 
 
 def test_prepare_source_frames_applies_crop():

@@ -16,13 +16,16 @@ from PySide6.QtWidgets import (
     QSlider,
     QSpinBox,
     QSplitter,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
+from PIL import Image
 
 from pixelator.config import CropConfig, TrimConfig
 from pixelator.errors import PixelatorError
 from pixelator.gui.models import JobQueue, JobStatus, RenderSettings, VideoJob
+from pixelator.gui.palette_panel import PalettePanel
 from pixelator.gui.preview import PreviewWidget, clamp_crop
 from pixelator.gui.queue_panel import QueuePanel
 from pixelator.gui.settings_panel import SettingsPanel
@@ -36,10 +39,12 @@ class MainWindow(QMainWindow):
         self.queue = JobQueue()
         self._loading_job = False
         self._syncing_crop_controls = False
+        self._current_preview_frame: Image.Image | None = None
         self._active_thread: QThread | None = None
         self._active_worker: RenderWorker | None = None
         self.queue_panel = QueuePanel()
         self.settings_panel = SettingsPanel()
+        self.palette_panel = PalettePanel()
         self.preview_widget = PreviewWidget()
 
         self.trim_start_spin = QDoubleSpinBox()
@@ -112,7 +117,11 @@ class MainWindow(QMainWindow):
         top_splitter = QSplitter(Qt.Orientation.Horizontal)
         top_splitter.addWidget(self.queue_panel)
         top_splitter.addWidget(preview_widget)
-        top_splitter.addWidget(self.settings_panel)
+
+        self.right_tabs = QTabWidget()
+        self.right_tabs.addTab(self.settings_panel, "Render")
+        self.right_tabs.addTab(self.palette_panel, "Palette")
+        top_splitter.addWidget(self.right_tabs)
         top_splitter.setSizes([260, 680, 320])
 
         main_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -155,6 +164,7 @@ class MainWindow(QMainWindow):
         self.queue_panel.start_button.clicked.connect(self._start_queue)
         self.queue_panel.cancel_button.clicked.connect(self._cancel_selected_job)
         self.queue_panel.list_widget.currentItemChanged.connect(lambda current, previous: self._load_selected_job())
+        self.palette_panel.extractCurrentFrameRequested.connect(self._extract_palette_from_current_frame)
         self.preview_widget.cropChanged.connect(self._on_crop_changed)
         self.trim_start_spin.valueChanged.connect(lambda value: self._on_trim_changed())
         self.trim_end_spin.valueChanged.connect(lambda value: self._on_trim_changed())
@@ -289,6 +299,7 @@ class MainWindow(QMainWindow):
         self._loading_job = True
         try:
             frame = extract_frame(job.source_path, seconds)
+            self._current_preview_frame = frame.copy()
             self.preview_widget.set_image(frame)
             if previous_crop is not None:
                 self.preview_widget.set_crop(previous_crop)
@@ -297,6 +308,13 @@ class MainWindow(QMainWindow):
                 self._set_crop_controls_from_crop(crop)
         finally:
             self._loading_job = was_loading
+
+    def _extract_palette_from_current_frame(self, count: int) -> None:
+        if self._current_preview_frame is None:
+            self.palette_panel.set_status_message("No current frame to extract")
+            return
+        self.palette_panel.extract_from_image(self._current_preview_frame, "current frame", count)
+        self.right_tabs.setCurrentWidget(self.palette_panel)
 
     def _set_crop_controls_from_crop(self, crop: CropConfig) -> None:
         source_size = self.preview_widget.source_size()
@@ -371,7 +389,18 @@ class MainWindow(QMainWindow):
 
     def _settings_for_job(self, job: VideoJob) -> RenderSettings:
         settings = self.settings_panel.settings()
-        return replace(settings, crop=job.crop, trim=job.trim)
+        custom_palette = self.palette_panel.colors() if self.palette_panel.has_custom_palette() else None
+        source_palette = self.palette_panel.source_colors() if self.palette_panel.auto_match_enabled() else None
+        palette_strategy = "auto_match" if custom_palette and source_palette else "custom"
+        return replace(
+            settings,
+            crop=job.crop,
+            trim=job.trim,
+            custom_palette=custom_palette,
+            source_palette=source_palette,
+            palette_strategy=palette_strategy,
+            palette_match_sort=self.palette_panel.match_sort_mode(),
+        )
 
     def _output_path_for_job(self, job: VideoJob) -> Path:
         output_dir = self.settings_panel.output_folder()

@@ -10,7 +10,14 @@ from pixelator.config import RenderConfig
 from pixelator.effects import apply_effects
 from pixelator.errors import VideoError
 from pixelator.image_ops import adjust_frame, pixelate_frame
-from pixelator.palette import apply_palette, build_global_palette, quantize_per_frame
+from pixelator.palette import (
+    apply_auto_match_palette,
+    apply_palette,
+    auto_match_palette,
+    build_global_palette,
+    custom_palette,
+    quantize_per_frame,
+)
 from pixelator.video import (
     VideoMetadata,
     ensure_output_path,
@@ -82,8 +89,10 @@ def process_frames(
     metadata: VideoMetadata,
 ) -> Iterator[Image.Image]:
     frame_list = list(frames)
+    explicit_palette = custom_palette(config.palette)
+    auto_match = auto_match_palette(config.palette)
     palette = None
-    if config.mode == "stable":
+    if explicit_palette is None and auto_match is None and config.mode == "stable":
         samples = sample_frames(frame_list, config.palette.sample_frames)
         adjusted_samples = [adjust_frame(pixelate_frame(frame, config.pixel), config.image) for frame in samples]
         palette = build_global_palette(adjusted_samples, config.palette)
@@ -91,11 +100,16 @@ def process_frames(
     for index, frame in enumerate(frame_list):
         result = pixelate_frame(frame, config.pixel)
         result = adjust_frame(result, config.image)
-        if config.mode == "stable" and palette is not None:
+        if explicit_palette is None and auto_match is None and config.mode == "stable" and palette is not None:
             result = apply_palette(result, palette)
-        else:
+        elif explicit_palette is None and auto_match is None:
             result = quantize_per_frame(result, config.palette)
         result = apply_effects(result, config.effects, frame_index=index)
+        if explicit_palette is not None:
+            result = apply_palette(result, explicit_palette)
+        elif auto_match is not None:
+            source_colors, target_colors, sort_mode = auto_match
+            result = apply_auto_match_palette(result, source_colors, target_colors, sort_mode)
         if result.size != metadata.size:
             result = result.resize(metadata.size, Image.Resampling.NEAREST)
         yield result

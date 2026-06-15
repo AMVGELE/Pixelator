@@ -94,3 +94,30 @@ def test_render_settings_default_output_format_is_mp4():
     settings = RenderSettings()
 
     assert settings.output_format == "mp4"
+    assert settings.crt == "off"
+    assert settings.vhs == "off"
+
+
+def test_render_settings_create_config_with_custom_palette():
+    settings = RenderSettings(custom_palette=["#000000", "#ffcc00"])
+
+    config = settings.to_config()
+
+    assert config.palette.strategy == "custom"
+    assert config.palette.custom_colors == ["#000000", "#ffcc00"]
+
+
+def test_render_settings_create_config_with_auto_match_palette():
+    settings = RenderSettings(
+        custom_palette=["#00ff00", "#ffff00"],
+        source_palette=["#ff0000", "#0000ff"],
+        palette_strategy="auto_match",
+        palette_match_sort="original",
+    )
+
+    config = settings.to_config()
+
+    assert config.palette.strategy == "auto_match"
+    assert config.palette.custom_colors == ["#00ff00", "#ffff00"]
+    assert config.palette.source_colors == ["#ff0000", "#0000ff"]
+    assert config.palette.match_sort == "original"
