@@ -117,10 +117,32 @@ def test_manifest_rejects_invalid_schema_version():
     _assert_artifact_invalid(exc_info)
 
 
+@pytest.mark.parametrize("schema_version", [True, 1.0])
+def test_manifest_from_dict_rejects_non_integer_schema_version(schema_version):
+    data = _manifest_data(schema_version=schema_version)
+
+    with pytest.raises(LayeringError) as exc_info:
+        LayerManifest.from_dict(data)
+
+    _assert_artifact_invalid(exc_info)
+
+
+@pytest.mark.parametrize("schema_version", [True, 1.0])
+def test_manifest_to_dict_rejects_non_integer_schema_version(schema_version):
+    manifest = _manifest(schema_version=schema_version)
+
+    with pytest.raises(LayeringError) as exc_info:
+        manifest.to_dict()
+
+    _assert_artifact_invalid(exc_info)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
         ("bbox", (4, 6, 32)),
+        ("bbox", (-1, 6, 32, 40)),
+        ("bbox", (4, 6, 0, 40)),
         ("width", 0),
         ("height", 0),
         ("order", -1),
@@ -151,6 +173,16 @@ def test_manifest_to_dict_rejects_invalid_metadata_fields(override):
 
     with pytest.raises(LayeringError) as exc_info:
         manifest.to_dict()
+
+    _assert_artifact_invalid(exc_info)
+
+
+@pytest.mark.parametrize("bbox", [[-1, 6, 32, 40], [4, 6, 0, 40]])
+def test_manifest_from_dict_rejects_invalid_bbox_geometry(bbox):
+    data = _manifest_data(layers=[_layer_data(bbox=bbox)])
+
+    with pytest.raises(LayeringError) as exc_info:
+        LayerManifest.from_dict(data)
 
     _assert_artifact_invalid(exc_info)
 

@@ -155,9 +155,7 @@ class LayerManifest:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LayerManifest":
-        version = data.get("schema_version")
-        if version != 1:
-            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest schema_version must be 1")
+        version = _require_schema_version(data.get("schema_version"))
         manifest = cls(
             schema_version=version,
             source=SourceInfo.from_dict(_require_dict(data, "source")),
@@ -169,8 +167,7 @@ class LayerManifest:
         return manifest
 
     def validate(self) -> None:
-        if self.schema_version != 1:
-            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest schema_version must be 1")
+        _require_schema_version(self.schema_version)
         if not self.layers:
             raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest must contain at least one layer")
         seen_files: set[str] = set()
@@ -218,6 +215,12 @@ def _require_non_negative_int(data: dict[str, Any], key: str) -> int:
     return value
 
 
+def _require_schema_version(value: Any) -> int:
+    if not _is_plain_int(value) or value != 1:
+        raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest schema_version must be 1")
+    return value
+
+
 def _require_bbox(value: Any) -> tuple[int, int, int, int]:
     if (
         not isinstance(value, (list, tuple))
@@ -225,7 +228,13 @@ def _require_bbox(value: Any) -> tuple[int, int, int, int]:
         or not all(_is_plain_int(item) for item in value)
     ):
         raise LayeringError(ErrorCode.ARTIFACT_INVALID, "layer bbox must contain four integers")
-    return (value[0], value[1], value[2], value[3])
+    x, y, width, height = value
+    if x < 0 or y < 0 or width <= 0 or height <= 0:
+        raise LayeringError(
+            ErrorCode.ARTIFACT_INVALID,
+            "layer bbox must contain non-negative x/y and positive width/height",
+        )
+    return (x, y, width, height)
 
 
 def _require_opacity(value: Any) -> float:
