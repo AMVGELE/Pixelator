@@ -117,6 +117,14 @@ def test_manifest_rejects_invalid_schema_version():
     _assert_artifact_invalid(exc_info)
 
 
+@pytest.mark.parametrize("data", [None, [], "bad"])
+def test_manifest_from_dict_rejects_malformed_top_level_manifest(data):
+    with pytest.raises(LayeringError) as exc_info:
+        LayerManifest.from_dict(data)
+
+    _assert_artifact_invalid(exc_info)
+
+
 @pytest.mark.parametrize("schema_version", [True, 1.0])
 def test_manifest_from_dict_rejects_non_integer_schema_version(schema_version):
     data = _manifest_data(schema_version=schema_version)
@@ -169,6 +177,23 @@ def test_manifest_to_dict_rejects_invalid_layer_fields(field, value):
     ],
 )
 def test_manifest_to_dict_rejects_invalid_metadata_fields(override):
+    manifest = _manifest(**override)
+
+    with pytest.raises(LayeringError) as exc_info:
+        manifest.to_dict()
+
+    _assert_artifact_invalid(exc_info)
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"source": {}},
+        {"model": {}},
+        {"preview": {}},
+    ],
+)
+def test_manifest_to_dict_rejects_wrong_metadata_object_types(override):
     manifest = _manifest(**override)
 
     with pytest.raises(LayeringError) as exc_info:

@@ -155,6 +155,8 @@ class LayerManifest:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LayerManifest":
+        if not isinstance(data, dict):
+            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest must be an object")
         version = _require_schema_version(data.get("schema_version"))
         manifest = cls(
             schema_version=version,
@@ -168,6 +170,15 @@ class LayerManifest:
 
     def validate(self) -> None:
         _require_schema_version(self.schema_version)
+        if not isinstance(self.source, SourceInfo):
+            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest source must be a source object")
+        if not isinstance(self.model, ModelInfo):
+            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest model must be a model object")
+        if not isinstance(self.preview, PreviewInfo):
+            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest preview must be a preview object")
+        self.source.to_dict()
+        self.model.to_dict()
+        self.preview.to_dict()
         if not self.layers:
             raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest must contain at least one layer")
         seen_files: set[str] = set()
