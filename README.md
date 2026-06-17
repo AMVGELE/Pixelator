@@ -98,6 +98,23 @@ is too far from every Source color, AutoMatch falls back to the nearest Render
 color so uncovered highlights or background colors do not collapse into dark
 blocks.
 
+## AI Layer Split CLI
+
+`pixelator-layer` sends AI art images to a cloud layer-splitting service. Each
+source image produces one ZIP archive.
+
+The ZIP contains transparent PNG layers, `manifest.json`, and
+`preview/composite.png`.
+
+```powershell
+$env:PIXELATOR_LAYER_API_KEY="your-service-token"
+pixelator-layer split .\inputs --out .\outputs\layers --endpoint https://your-layer-service --overwrite
+```
+
+The default Pixelator install does not include Qwen model weights or GPU
+dependencies. For the Aliyun/Bailian deployment path, see
+`docs/layer-split-aliyun.md`.
+
 ## Desktop GUI
 
 ```bash

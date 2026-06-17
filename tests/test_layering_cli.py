@@ -1,5 +1,7 @@
 import importlib
 import json
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -7,6 +9,9 @@ from PIL import Image
 
 from pixelator.layering import cli
 from pixelator.layering.archive import write_layer_zip
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class FakeClient:
@@ -20,7 +25,7 @@ class FakeClient:
 
 
 def test_project_scripts_point_to_importable_callables():
-    pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    pyproject_path = PROJECT_ROOT / "pyproject.toml"
     pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
 
     for script_name, entry_point in pyproject["project"]["scripts"].items():
@@ -31,6 +36,36 @@ def test_project_scripts_point_to_importable_callables():
             target = getattr(target, attribute)
 
         assert callable(target), f"{script_name} target is not callable: {entry_point}"
+
+
+def test_layering_cli_module_prints_root_help():
+    result = subprocess.run(
+        [sys.executable, "-m", "pixelator.layering.cli", "--help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "pixelator-layer" in result.stdout
+    assert "split" in result.stdout
+
+
+def test_layering_cli_module_prints_split_help():
+    result = subprocess.run(
+        [sys.executable, "-m", "pixelator.layering.cli", "split", "--help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--endpoint" in result.stdout
+    assert "--api-key-env" in result.stdout
+    assert "--layers" in result.stdout
+    assert "--overwrite" in result.stdout
 
 
 def test_cli_splits_image_folder_and_writes_summary(monkeypatch, tmp_path: Path):
