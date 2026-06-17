@@ -25,6 +25,8 @@ dev = [
 [project.scripts]
 pixelator = "pixelator.cli:main"
 pixelator-gui = "pixelator.gui.app:main"
+pixelator-layer = "pixelator.layering.cli:main"
+pixelator-layer-service = "pixelator.layering_service.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
