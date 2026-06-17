@@ -10,6 +10,7 @@ import pytest
 from PIL import Image
 
 from pixelator.layering.archive import validate_layer_zip
+from pixelator.layering_service.backends import LayerRequest, SelfHostedQwenLayerBackend
 
 
 def _test_client():
@@ -32,6 +33,31 @@ def _post_image(client, filename: str, content: bytes, request: str = "{}"):
         files={"image": (filename, content, "image/png")},
         data={"request": request},
     )
+
+
+class FakeQwenOutput:
+    def __init__(self, layers):
+        self.images = [layers]
+
+
+class FakeQwenPipeline:
+    def __call__(self, **kwargs):
+        image = kwargs["image"].convert("RGBA")
+        transparent = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        return FakeQwenOutput([image, transparent])
+
+
+def test_self_hosted_qwen_backend_uses_injected_pipeline(tmp_path: Path):
+    source = tmp_path / "hero.png"
+    Image.new("RGBA", (4, 4), (255, 0, 0, 255)).save(source)
+    backend = SelfHostedQwenLayerBackend(pipeline_factory=lambda: FakeQwenPipeline())
+
+    manifest = backend.split(source, tmp_path / "artifact.zip", LayerRequest(target_layers=2))
+
+    assert backend.backend_name == "aliyun-self-hosted"
+    assert manifest.model.model_id == "Qwen/Qwen-Image-Layered"
+    assert len(manifest.layers) == 2
+    assert (tmp_path / "artifact.zip").exists()
 
 
 def test_dev_optional_dependencies_include_test_client_runtime():
