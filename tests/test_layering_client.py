@@ -1,7 +1,10 @@
 import json
 import threading
+from email import policy
+from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from socket import timeout as SocketTimeout
 
 import pytest
 from PIL import Image
@@ -13,11 +16,40 @@ from pixelator.layering.types import ErrorCode, LayeringError
 
 class FakeLayerHandler(BaseHTTPRequestHandler):
     artifact_path: Path
+    observed_authorization: str | None = None
+    observed_content_type: str | None = None
+    observed_body: bytes | None = None
+    observed_file_name: str | None = None
+    observed_form_fields: set[str] = set()
+    observed_request_json: dict | None = None
+
+    @classmethod
+    def reset_observations(cls):
+        cls.observed_authorization = None
+        cls.observed_content_type = None
+        cls.observed_body = None
+        cls.observed_file_name = None
+        cls.observed_form_fields = set()
+        cls.observed_request_json = None
 
     def do_POST(self):
         if self.path != "/v1/layer-splits":
             self.send_error(404)
             return
+        self.__class__.observed_authorization = self.headers.get("Authorization")
+        self.__class__.observed_content_type = self.headers.get("Content-Type")
+        content_length = int(self.headers.get("Content-Length", "0"))
+        self.connection.settimeout(0.1)
+        try:
+            upload_body = self.rfile.read(content_length)
+        except (OSError, SocketTimeout):
+            self.send_error(400, "request body was not uploaded")
+            return
+        if len(upload_body) != content_length:
+            self.send_error(400, "request body was truncated")
+            return
+        self.__class__.observed_body = upload_body
+        self._parse_multipart(upload_body)
         body = json.dumps({"job_id": "job_123", "status": "queued"}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -54,6 +86,25 @@ class FakeLayerHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
+    def _parse_multipart(self, upload_body: bytes):
+        content_type = self.headers.get("Content-Type", "")
+        message = BytesParser(policy=policy.default).parsebytes(
+            b"Content-Type: "
+            + content_type.encode("utf-8")
+            + b"\r\nMIME-Version: 1.0\r\n\r\n"
+            + upload_body
+        )
+        for part in message.iter_parts():
+            field_name = part.get_param("name", header="content-disposition")
+            if field_name is None:
+                continue
+            self.__class__.observed_form_fields.add(field_name)
+            if field_name == "image":
+                self.__class__.observed_file_name = part.get_filename()
+            if field_name == "request":
+                payload = part.get_payload(decode=True) or b"{}"
+                self.__class__.observed_request_json = json.loads(payload.decode("utf-8"))
+
 
 def test_client_submits_polls_and_downloads_artifact(tmp_path: Path):
     source = tmp_path / "hero.png"
@@ -61,6 +112,7 @@ def test_client_submits_polls_and_downloads_artifact(tmp_path: Path):
     artifact = tmp_path / "artifact.zip"
     write_layer_zip(source, Image.open(source), [Image.open(source)], artifact, backend="mock", model_id="mock")
     FakeLayerHandler.artifact_path = artifact
+    FakeLayerHandler.reset_observations()
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeLayerHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -75,6 +127,18 @@ def test_client_submits_polls_and_downloads_artifact(tmp_path: Path):
 
     assert downloaded.source.file_name == "hero.png"
     assert (tmp_path / "downloaded.zip").exists()
+    assert FakeLayerHandler.observed_authorization == "Bearer secret"
+    assert FakeLayerHandler.observed_content_type is not None
+    assert "multipart/form-data" in FakeLayerHandler.observed_content_type
+    assert "boundary=" in FakeLayerHandler.observed_content_type
+    assert FakeLayerHandler.observed_body
+    assert FakeLayerHandler.observed_file_name == "hero.png"
+    assert {"image", "request"} <= FakeLayerHandler.observed_form_fields
+    assert FakeLayerHandler.observed_request_json == {
+        "target_layers": 4,
+        "crop_alpha": True,
+        "zip_result": True,
+    }
 
 
 def test_client_maps_auth_failure_to_auth_error(tmp_path: Path):

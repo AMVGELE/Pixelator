@@ -17,6 +17,9 @@ from pixelator.layering.archive import validate_layer_zip
 from pixelator.layering.types import ErrorCode, JobStatus, LayerManifest, LayeringError
 
 
+_EARLY_RESPONSE_WAIT_SECONDS = 0.05
+
+
 class LayerSplitClient:
     def __init__(
         self,
@@ -195,7 +198,7 @@ class LayerSplitClient:
             sock = connection.sock
             if sock is None:
                 raise LayeringError(ErrorCode.JOB_FAILED, "layer split connection was not opened")
-            early_response_wait = min(0.2, max(0.0, self.timeout))
+            early_response_wait = min(_EARLY_RESPONSE_WAIT_SECONDS, max(0.0, self.timeout))
             if not _socket_has_early_response(sock, early_response_wait):
                 sock.sendall(body)
             elif _peek_status_is_continue(sock):
