@@ -9,6 +9,9 @@ from pixelator.layering.types import JobStatus
 from pixelator.layering_service.backends import LayerBackend, LayerRequest, MockLayerBackend
 from pixelator.layering_service.jobs import JobStore
 
+_UPLOAD_CHUNK_SIZE = 1024 * 1024
+_UPLOAD_SUFFIXES = {".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
+
 
 def create_app(
     api_token: str | None = None,
@@ -24,6 +27,7 @@ def create_app(
         ) from exc
 
     token = api_token or os.environ.get("PIXELATOR_LAYER_SERVICE_TOKEN") or "dev-token"
+    max_upload_bytes = _max_upload_bytes()
     temporary_work_dir: tempfile.TemporaryDirectory[str] | None = None
     if work_dir is None:
         temporary_work_dir = tempfile.TemporaryDirectory(prefix="pixelator-layer-service-")
@@ -46,6 +50,20 @@ def create_app(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+    async def write_upload(upload: UploadFile, destination: Path) -> None:
+        total_bytes = 0
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with destination.open("wb") as handle:
+                while chunk := await upload.read(_UPLOAD_CHUNK_SIZE):
+                    total_bytes += len(chunk)
+                    if total_bytes > max_upload_bytes:
+                        raise HTTPException(status_code=413, detail="uploaded image exceeds size limit")
+                    handle.write(chunk)
+        except HTTPException:
+            _unlink_if_exists(destination)
+            raise
+
     @app.post("/v1/layer-splits")
     async def submit_layer_split(
         image: UploadFile = File(...),
@@ -58,9 +76,8 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        source_path = service_work_dir / "uploads" / uuid.uuid4().hex / _safe_file_name(image.filename)
-        source_path.parent.mkdir(parents=True, exist_ok=True)
-        source_path.write_bytes(await image.read())
+        source_path = service_work_dir / "uploads" / f"{uuid.uuid4().hex}{_safe_upload_suffix(image.filename)}"
+        await write_upload(image, source_path)
 
         job = store.create_and_run(source_path, layer_request)
         return {"job_id": job.id, "status": job.status.value}
@@ -102,6 +119,10 @@ def create_app(
 
 
 def main() -> int:
+    token = os.environ.get("PIXELATOR_LAYER_SERVICE_TOKEN")
+    if not token:
+        raise RuntimeError("PIXELATOR_LAYER_SERVICE_TOKEN must be set to run pixelator-layer-service")
+
     try:
         import uvicorn
     except ImportError as exc:
@@ -110,7 +131,7 @@ def main() -> int:
         ) from exc
 
     port = int(os.environ.get("PIXELATOR_LAYER_SERVICE_PORT", "8000"))
-    uvicorn.run(create_app(), host="0.0.0.0", port=port)
+    uvicorn.run(create_app(api_token=token), host="0.0.0.0", port=port)
     return 0
 
 
@@ -138,6 +159,28 @@ def _parse_layer_request(request_json: str) -> LayerRequest:
     return LayerRequest(target_layers=target_layers, crop_alpha=crop_alpha, zip_result=zip_result)
 
 
-def _safe_file_name(file_name: str | None) -> str:
-    name = (file_name or "upload.png").replace("\\", "/").rsplit("/", maxsplit=1)[-1]
-    return name or "upload.png"
+def _max_upload_bytes() -> int:
+    raw_value = os.environ.get("PIXELATOR_LAYER_SERVICE_MAX_UPLOAD_MB", "64")
+    try:
+        megabytes = int(raw_value)
+    except ValueError as exc:
+        raise RuntimeError("PIXELATOR_LAYER_SERVICE_MAX_UPLOAD_MB must be an integer") from exc
+
+    if megabytes < 0:
+        raise RuntimeError("PIXELATOR_LAYER_SERVICE_MAX_UPLOAD_MB must be non-negative")
+    return megabytes * 1024 * 1024
+
+
+def _safe_upload_suffix(file_name: str | None) -> str:
+    name = (file_name or "").replace("\\", "/").rsplit("/", maxsplit=1)[-1]
+    suffix = Path(name).suffix.lower()
+    if suffix in _UPLOAD_SUFFIXES:
+        return suffix
+    return ".bin"
+
+
+def _unlink_if_exists(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
