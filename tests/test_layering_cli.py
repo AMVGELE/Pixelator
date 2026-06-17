@@ -1,4 +1,6 @@
+import importlib
 import json
+import tomllib
 from pathlib import Path
 
 from PIL import Image
@@ -15,6 +17,20 @@ class FakeClient:
     def split_image(self, image_path, output_path, target_layers=None):
         image = Image.open(image_path).convert("RGBA")
         return write_layer_zip(image_path, image, [image], output_path, backend="fake", model_id="fake")
+
+
+def test_project_scripts_point_to_importable_callables():
+    pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+
+    for script_name, entry_point in pyproject["project"]["scripts"].items():
+        module_name, function_name = entry_point.split(":", maxsplit=1)
+        module = importlib.import_module(module_name)
+        target = module
+        for attribute in function_name.split("."):
+            target = getattr(target, attribute)
+
+        assert callable(target), f"{script_name} target is not callable: {entry_point}"
 
 
 def test_cli_splits_image_folder_and_writes_summary(monkeypatch, tmp_path: Path):
