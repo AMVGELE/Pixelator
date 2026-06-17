@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 from uuid import uuid4
@@ -26,6 +26,17 @@ class JobStatus(StrEnum):
 
 
 @dataclass(frozen=True)
+class PaletteSnapshot:
+    source_colors: list[str] = field(default_factory=list)
+    render_colors: list[str] = field(default_factory=list)
+    auto_match: bool = True
+    match_sort: str = "hue_brightness"
+
+    def has_render_palette(self) -> bool:
+        return len(self.render_colors) >= 2
+
+
+@dataclass(frozen=True)
 class VideoJob:
     source_path: Path
     id: str = ""
@@ -39,10 +50,18 @@ class VideoJob:
     width: int | None = None
     height: int | None = None
     fps: float | None = None
+    media_type: str = "video"
+    settings_override: RenderSettings | None = None
+    palette_mode: str = "shared"
+    palette_snapshot: PaletteSnapshot | None = None
 
     def __post_init__(self) -> None:
         if not self.id:
             object.__setattr__(self, "id", uuid4().hex)
+
+    @property
+    def is_image(self) -> bool:
+        return self.media_type == "image"
 
 
 @dataclass(frozen=True)

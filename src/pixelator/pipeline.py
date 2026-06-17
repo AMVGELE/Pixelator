@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Iterable, Iterator
@@ -8,8 +9,10 @@ from PIL import Image
 
 from pixelator.config import RenderConfig
 from pixelator.effects import apply_effects
-from pixelator.errors import VideoError
+from pixelator.errors import ImageError, MediaError, VideoError
+from pixelator.image_io import load_static_image, save_static_image
 from pixelator.image_ops import adjust_frame, pixelate_frame
+from pixelator.media import is_image_path, is_video_path
 from pixelator.palette import (
     apply_auto_match_palette,
     apply_palette,
@@ -149,3 +152,63 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
             final_output.write_bytes(silent_output.read_bytes())
 
     return final_output
+
+
+def render_image(input_path: str | Path, output_path: str | Path, config: RenderConfig) -> Path:
+    input_file = Path(input_path)
+    if not input_file.exists():
+        raise ImageError(f"Input image does not exist: {input_file}")
+    if not is_image_path(input_file):
+        raise ImageError(f"Unsupported image input format: {input_file.suffix}")
+
+    final_output = ensure_output_path(output_path, overwrite=config.output.overwrite)
+    image = load_static_image(input_file)
+    alpha = image.getchannel("A").copy() if "A" in image.getbands() else None
+    rgb_image = image.convert("RGB")
+    image_config = replace(config, trim=None)
+    source_metadata = VideoMetadata(width=image.width, height=image.height, fps=1.0, duration=None)
+    frames, metadata = prepare_source_frames([rgb_image], image_config, source_metadata, encoder_safe=False)
+    alpha = _prepare_image_alpha(alpha, image_config, source_metadata)
+    processed = list(process_frames(frames, image_config, metadata))
+    if not processed:
+        raise ImageError(f"Could not render image: {input_file}")
+    result = _apply_image_alpha(processed[0], alpha)
+    save_static_image(result, final_output)
+    return final_output
+
+
+def _prepare_image_alpha(
+    alpha: Image.Image | None,
+    config: RenderConfig,
+    metadata: VideoMetadata,
+) -> Image.Image | None:
+    if alpha is None:
+        return None
+    if config.crop is None:
+        return alpha
+    left = config.crop.x
+    upper = config.crop.y
+    right = min(metadata.width, left + config.crop.width)
+    lower = min(metadata.height, upper + config.crop.height)
+    if right <= left or lower <= upper:
+        raise VideoError("Crop rectangle is outside the source frame")
+    return alpha.crop((left, upper, right, lower))
+
+
+def _apply_image_alpha(image: Image.Image, alpha: Image.Image | None) -> Image.Image:
+    if alpha is None:
+        return image
+    result = image.convert("RGBA")
+    if alpha.size != result.size:
+        alpha = alpha.resize(result.size, Image.Resampling.NEAREST)
+    result.putalpha(alpha)
+    return result
+
+
+def render_media(input_path: str | Path, output_path: str | Path, config: RenderConfig) -> Path:
+    input_file = Path(input_path)
+    if is_image_path(input_file):
+        return render_image(input_file, output_path, config)
+    if is_video_path(input_file):
+        return render_video(input_file, output_path, config)
+    raise MediaError(f"Unsupported input media type: {input_file.suffix or input_file}")

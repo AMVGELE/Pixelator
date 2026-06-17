@@ -23,25 +23,116 @@ class PalettePreset:
     colors: list[str]
 
 
-def extract_palette_from_image(image: Image.Image, count: int) -> list[str]:
+def extract_palette_from_image(image: Image.Image, count: int, method: str = "dominant") -> list[str]:
     if not 2 <= count <= 256:
         raise ConfigError("palette extract count must be between 2 and 256")
 
     source = image.convert("RGB")
+    if method == "dominant":
+        return _extract_dominant_palette(source, count)
+    if method == "balanced_hue":
+        return _extract_balanced_hue_palette(source, count)
+    if method == "tonal":
+        return _extract_tonal_palette(source, count)
+    raise ConfigError("palette extract method must be dominant, balanced_hue, or tonal")
+
+
+def _extract_dominant_palette(source: Image.Image, count: int) -> list[str]:
+    return [color for color, _frequency in _quantized_color_counts(source, count)][:count]
+
+
+def _extract_balanced_hue_palette(source: Image.Image, count: int) -> list[str]:
+    candidates = _quantized_color_counts(source, min(256, max(count * 4, count)))
+    buckets: dict[int, list[str]] = {}
+    for color, _frequency in candidates:
+        hue, saturation, _value = _hsv(parse_hex_color(color))
+        bucket = 12 if saturation < 0.12 else min(11, int(hue * 12))
+        buckets.setdefault(bucket, []).append(color)
+
+    result: list[str] = []
+    bucket_order = [key for key in sorted(buckets) if key != 12]
+    if 12 in buckets:
+        bucket_order.append(12)
+    while len(result) < count and bucket_order:
+        progressed = False
+        for key in bucket_order:
+            if buckets[key]:
+                color = buckets[key].pop(0)
+                if color not in result:
+                    result.append(color)
+                    progressed = True
+                if len(result) >= count:
+                    break
+        if not progressed:
+            break
+    return result
+
+
+def _extract_tonal_palette(source: Image.Image, count: int) -> list[str]:
+    groups: list[list[RGB]] = [[], [], []]
+    for pixel in source.getdata():
+        rgb = pixel[:3] if isinstance(pixel, tuple) else (pixel, pixel, pixel)
+        luminance = _luminance(rgb)  # type: ignore[arg-type]
+        if luminance < 85:
+            groups[0].append(rgb)  # type: ignore[arg-type]
+        elif luminance < 170:
+            groups[1].append(rgb)  # type: ignore[arg-type]
+        else:
+            groups[2].append(rgb)  # type: ignore[arg-type]
+
+    non_empty = [(index, pixels) for index, pixels in enumerate(groups) if pixels]
+    if not non_empty:
+        return []
+
+    allocations = _tonal_allocations([len(pixels) for _index, pixels in non_empty], count)
+    result: list[str] = []
+    for (_index, pixels), quota in zip(non_empty, allocations, strict=True):
+        group_image = Image.new("RGB", (len(pixels), 1))
+        group_image.putdata(pixels)
+        for color in _extract_dominant_palette(group_image, min(256, quota)):
+            if color not in result:
+                result.append(color)
+            if len(result) >= count:
+                return result
+    return result
+
+
+def _tonal_allocations(group_sizes: list[int], count: int) -> list[int]:
+    allocations = [1 for _size in group_sizes]
+    remaining = max(0, count - len(allocations))
+    total = sum(group_sizes)
+    if total <= 0:
+        return allocations
+    shares = [(size / total) * remaining for size in group_sizes]
+    for index, share in enumerate(shares):
+        extra = int(share)
+        allocations[index] += extra
+        remaining -= extra
+    remainders = sorted(
+        range(len(group_sizes)),
+        key=lambda index: shares[index] - int(shares[index]),
+        reverse=True,
+    )
+    for index in remainders[:remaining]:
+        allocations[index] += 1
+    return allocations
+
+
+def _quantized_color_counts(source: Image.Image, count: int) -> list[tuple[str, int]]:
     quantized = source.quantize(colors=count, dither=Image.Dither.NONE)
     raw_palette = quantized.getpalette() or []
     pixel_data = quantized.get_flattened_data() if hasattr(quantized, "get_flattened_data") else quantized.getdata()
     counts = Counter(pixel_data)
 
-    colors: list[str] = []
+    colors: list[tuple[str, int]] = []
     for index, _frequency in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
         offset = index * 3
         rgb = tuple(raw_palette[offset : offset + 3])
         if len(rgb) != 3:
             continue
         color = rgb_to_hex(rgb)  # type: ignore[arg-type]
-        if color not in colors:
-            colors.append(color)
+        if color not in [existing for existing, _count in colors]:
+            colors.append((color, int(_frequency)))
     return colors[:count]
 
 

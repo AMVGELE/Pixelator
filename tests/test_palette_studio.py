@@ -32,6 +32,32 @@ def test_extract_palette_from_image_returns_frequency_ordered_hex_colors():
     assert colors == ["#ff0000", "#00ff00", "#0000ff"]
 
 
+def test_extract_palette_balanced_hue_covers_distinct_hues():
+    image = Image.new("RGB", (16, 1))
+    image.putdata(
+        [(255, 0, 0)] * 10
+        + [(0, 255, 0)] * 3
+        + [(0, 0, 255)] * 3
+    )
+
+    colors = extract_palette_from_image(image, 3, method="balanced_hue")
+
+    assert set(colors) == {"#ff0000", "#00ff00", "#0000ff"}
+
+
+def test_extract_palette_tonal_returns_shadow_mid_and_highlight_colors():
+    image = Image.new("RGB", (6, 1))
+    image.putdata(
+        [(16, 16, 16)] * 2
+        + [(128, 128, 128)] * 2
+        + [(240, 240, 240)] * 2
+    )
+
+    colors = extract_palette_from_image(image, 3, method="tonal")
+
+    assert colors == ["#101010", "#808080", "#f0f0f0"]
+
+
 def test_extract_palette_from_low_color_image_can_return_fewer_than_requested():
     image = Image.new("RGB", (4, 1))
     image.putdata([(0, 0, 0), (0, 0, 0), (255, 255, 255), (255, 255, 255)])
@@ -47,6 +73,13 @@ def test_extract_palette_from_image_rejects_invalid_count():
 
     with pytest.raises(ConfigError, match="between 2 and 256"):
         extract_palette_from_image(image, 1)
+
+
+def test_extract_palette_from_image_rejects_invalid_method():
+    image = Image.new("RGB", (2, 2))
+
+    with pytest.raises(ConfigError, match="extract method"):
+        extract_palette_from_image(image, 2, method="edge")
 
 
 def test_load_lospec_palette_file_accepts_hash_and_plain_hex(tmp_path: Path):

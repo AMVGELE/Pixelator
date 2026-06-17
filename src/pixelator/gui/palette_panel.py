@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSignalBlocker, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPen
 from PySide6.QtWidgets import (
     QColorDialog,
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from pixelator.errors import ConfigError
+from pixelator.gui.models import PaletteSnapshot
 from pixelator.palette_io import load_palette_file, normalize_hex_color, normalize_hex_colors, save_palette_file
 from pixelator.palette_studio import (
     delete_palette_preset,
@@ -43,7 +44,8 @@ from pixelator.palette_studio import (
 
 class PalettePanel(QWidget):
     paletteChanged = Signal()
-    extractCurrentFrameRequested = Signal(int)
+    paletteModeChanged = Signal(str)
+    extractCurrentFrameRequested = Signal(int, str, str)
 
     def __init__(self, preset_dir: str | Path | None = None) -> None:
         super().__init__()
@@ -54,10 +56,22 @@ class PalettePanel(QWidget):
         self._selected_render_index: int | None = None
         self._render_selection_manual = False
         self._syncing_selection = False
+        self._syncing_palette_mode = False
+
+        self.palette_mode_combo = QComboBox()
+        self.palette_mode_combo.addItem("Shared Palette", "shared")
+        self.palette_mode_combo.addItem("Per Item Palette", "item")
 
         self.extract_count_spin = QSpinBox()
         self.extract_count_spin.setRange(2, 256)
         self.extract_count_spin.setValue(32)
+        self.extract_method_combo = QComboBox()
+        self.extract_method_combo.addItem("Dominant Colors", "dominant")
+        self.extract_method_combo.addItem("Balanced Hue", "balanced_hue")
+        self.extract_method_combo.addItem("Shadows / Midtones / Highlights", "tonal")
+        self.extract_scope_combo = QComboBox()
+        self.extract_scope_combo.addItem("Full Frame", "full")
+        self.extract_scope_combo.addItem("Current Crop", "crop")
         self.extract_current_frame_button = QPushButton("Current Frame")
         self.extract_image_button = QPushButton("Image...")
 
@@ -112,8 +126,51 @@ class PalettePanel(QWidget):
     def match_sort_mode(self) -> str:
         return str(self.sort_combo.currentData() or "hue_brightness")
 
+    def palette_mode(self) -> str:
+        return str(self.palette_mode_combo.currentData() or "shared")
+
+    def set_palette_mode(self, mode: str) -> None:
+        blocker = QSignalBlocker(self.palette_mode_combo)
+        try:
+            self._set_combo_data(self.palette_mode_combo, mode)
+        finally:
+            del blocker
+
+    def extract_method(self) -> str:
+        return str(self.extract_method_combo.currentData() or "dominant")
+
+    def extract_scope(self) -> str:
+        return str(self.extract_scope_combo.currentData() or "full")
+
     def has_custom_palette(self) -> bool:
         return len(self._colors) >= 2
+
+    def snapshot(self) -> PaletteSnapshot:
+        return PaletteSnapshot(
+            source_colors=self.source_colors(),
+            render_colors=self.colors(),
+            auto_match=self.auto_match_check.isChecked(),
+            match_sort=self.match_sort_mode(),
+        )
+
+    def load_snapshot(self, snapshot: PaletteSnapshot, emit_changed: bool = False) -> None:
+        normalized_source = normalize_hex_colors(snapshot.source_colors)
+        normalized_render = normalize_hex_colors(snapshot.render_colors)
+        blockers = [QSignalBlocker(self.auto_match_check), QSignalBlocker(self.sort_combo)]
+        try:
+            self._source_colors = list(normalized_source)
+            self._colors = list(normalized_render)
+            self.auto_match_check.setChecked(snapshot.auto_match)
+            self._set_combo_data(self.sort_combo, snapshot.match_sort)
+            self._selected_source_index = 0 if self._source_colors else None
+            self._selected_render_index = 0 if self._colors else None
+            self._render_selection_manual = False
+        finally:
+            del blockers
+        self._sync_matched_render_selection()
+        self._refresh()
+        if emit_changed:
+            self.paletteChanged.emit()
 
     def set_colors(self, colors: list[str]) -> None:
         self._colors = normalize_hex_colors(colors)
@@ -241,9 +298,19 @@ class PalettePanel(QWidget):
             return
         self._set_status(f"Saved {palette_path.name}")
 
-    def extract_from_image(self, image: Image.Image, source_label: str = "image", count: int | None = None) -> None:
+    def extract_from_image(
+        self,
+        image: Image.Image,
+        source_label: str = "image",
+        count: int | None = None,
+        method: str | None = None,
+    ) -> None:
         try:
-            colors = extract_palette_from_image(image, count if count is not None else self.extract_count_spin.value())
+            colors = extract_palette_from_image(
+                image,
+                count if count is not None else self.extract_count_spin.value(),
+                method if method is not None else self.extract_method(),
+            )
         except ConfigError as exc:
             self._set_status(str(exc))
             return
@@ -336,23 +403,28 @@ class PalettePanel(QWidget):
         title.setObjectName("panelTitle")
 
         tool_row = QGridLayout()
-        tool_row.addWidget(QLabel("Extract"), 0, 0)
-        tool_row.addWidget(self.extract_count_spin, 0, 1)
-        tool_row.addWidget(self.extract_current_frame_button, 0, 2)
-        tool_row.addWidget(self.extract_image_button, 0, 3)
-        tool_row.addWidget(QLabel("Preset"), 1, 0)
-        tool_row.addWidget(self.preset_combo, 1, 1, 1, 2)
-        tool_row.addWidget(self.load_preset_button, 1, 3)
-        tool_row.addWidget(self.preset_name_edit, 2, 0, 1, 2)
-        tool_row.addWidget(self.save_preset_button, 2, 2)
-        tool_row.addWidget(self.delete_preset_button, 2, 3)
-        tool_row.addWidget(self.load_button, 3, 0)
-        tool_row.addWidget(self.save_button, 3, 1)
-        tool_row.addWidget(self.import_lospec_button, 3, 2)
-        tool_row.addWidget(self.apply_sort_button, 3, 3)
-        tool_row.addWidget(QLabel("Sort"), 4, 0)
-        tool_row.addWidget(self.sort_combo, 4, 1, 1, 2)
-        tool_row.addWidget(self.auto_match_check, 4, 3)
+        tool_row.addWidget(QLabel("Palette"), 0, 0)
+        tool_row.addWidget(self.palette_mode_combo, 0, 1, 1, 3)
+        tool_row.addWidget(QLabel("Extract"), 1, 0)
+        tool_row.addWidget(self.extract_count_spin, 1, 1)
+        tool_row.addWidget(self.extract_current_frame_button, 1, 2)
+        tool_row.addWidget(self.extract_image_button, 1, 3)
+        tool_row.addWidget(QLabel("Method"), 2, 0)
+        tool_row.addWidget(self.extract_method_combo, 2, 1, 1, 2)
+        tool_row.addWidget(self.extract_scope_combo, 2, 3)
+        tool_row.addWidget(QLabel("Preset"), 3, 0)
+        tool_row.addWidget(self.preset_combo, 3, 1, 1, 2)
+        tool_row.addWidget(self.load_preset_button, 3, 3)
+        tool_row.addWidget(self.preset_name_edit, 4, 0, 1, 2)
+        tool_row.addWidget(self.save_preset_button, 4, 2)
+        tool_row.addWidget(self.delete_preset_button, 4, 3)
+        tool_row.addWidget(self.load_button, 5, 0)
+        tool_row.addWidget(self.save_button, 5, 1)
+        tool_row.addWidget(self.import_lospec_button, 5, 2)
+        tool_row.addWidget(self.apply_sort_button, 5, 3)
+        tool_row.addWidget(QLabel("Sort"), 6, 0)
+        tool_row.addWidget(self.sort_combo, 6, 1, 1, 2)
+        tool_row.addWidget(self.auto_match_check, 6, 3)
 
         render_actions = QGridLayout()
         for index, button in enumerate(
@@ -400,8 +472,13 @@ class PalettePanel(QWidget):
         self.match_board.renderClicked.connect(self._on_render_color_clicked)
         self.match_board.renderDoubleClicked.connect(self._on_render_color_double_clicked)
         self.hex_edit.editingFinished.connect(self.apply_hex_to_selected)
+        self.palette_mode_combo.currentIndexChanged.connect(self._on_palette_mode_changed)
         self.extract_current_frame_button.clicked.connect(
-            lambda: self.extractCurrentFrameRequested.emit(self.extract_count_spin.value())
+            lambda: self.extractCurrentFrameRequested.emit(
+                self.extract_count_spin.value(),
+                self.extract_method(),
+                self.extract_scope(),
+            )
         )
         self.extract_image_button.clicked.connect(lambda: self.extract_from_image_file())
         self.add_button.clicked.connect(self._add_with_color_dialog)
@@ -417,7 +494,7 @@ class PalettePanel(QWidget):
         self.delete_preset_button.clicked.connect(lambda: self.delete_selected_preset())
         self.apply_sort_button.clicked.connect(self.apply_sort)
         self.auto_match_check.toggled.connect(self._on_auto_match_toggled)
-        self.sort_combo.currentIndexChanged.connect(lambda index: self._refresh())
+        self.sort_combo.currentIndexChanged.connect(lambda index: self._on_sort_mode_changed())
 
     def _refresh(self) -> None:
         if not self._render_selection_manual:
@@ -461,6 +538,16 @@ class PalettePanel(QWidget):
         self._render_selection_manual = False
         self._sync_matched_render_selection()
         self._refresh()
+        self.paletteChanged.emit()
+
+    def _on_sort_mode_changed(self) -> None:
+        self._refresh()
+        self.paletteChanged.emit()
+
+    def _on_palette_mode_changed(self, index: int) -> None:
+        if self._syncing_palette_mode:
+            return
+        self.paletteModeChanged.emit(self.palette_mode())
 
     def _add_with_color_dialog(self) -> None:
         default = self._colors[self._selected_render_index] if self._selected_index() is not None else "#000000"
@@ -647,6 +734,12 @@ class PalettePanel(QWidget):
             return colors.index(color)
         except ValueError:
             return None
+
+    def _set_combo_data(self, combo: QComboBox, value: str) -> None:
+        for index in range(combo.count()):
+            if combo.itemData(index) == value:
+                combo.setCurrentIndex(index)
+                return
 
 
 @dataclass(frozen=True)

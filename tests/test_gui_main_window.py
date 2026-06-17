@@ -203,6 +203,55 @@ def test_file_chooser_includes_gif_filter(monkeypatch, qapp):
     window._choose_files()
 
     assert "*.gif" in captured["filter"]
+    assert "*.png" in captured["filter"]
+    window.close()
+
+
+def test_add_image_path_loads_preview_and_disables_timeline(tmp_path: Path, qapp):
+    source = tmp_path / "texture.png"
+    Image.new("RGB", (7, 5), (255, 0, 0)).save(source)
+
+    window = MainWindow()
+    window.add_media_paths([source])
+
+    job = window.queue.jobs[0]
+    assert job.is_image
+    assert job.width == 7
+    assert job.height == 5
+    assert job.trim is None
+    assert window.preview_widget.source_size() == (7, 5)
+    assert not window.trim_start_spin.isEnabled()
+    assert not window.trim_end_spin.isEnabled()
+    assert not window.scrubber_slider.isEnabled()
+    window.close()
+
+
+def test_add_image_folder_batches_supported_images(tmp_path: Path, qapp):
+    first = tmp_path / "b.png"
+    second = tmp_path / "a.jpg"
+    Image.new("RGB", (2, 2), (255, 0, 0)).save(first)
+    Image.new("RGB", (3, 3), (0, 255, 0)).save(second)
+    (tmp_path / "notes.txt").write_text("ignore", encoding="utf-8")
+
+    window = MainWindow()
+    window.add_media_paths([tmp_path])
+
+    assert [job.source_path.name for job in window.queue.jobs] == ["a.jpg", "b.png"]
+    assert all(job.is_image for job in window.queue.jobs)
+    window.close()
+
+
+def test_choose_folder_adds_image_directory(monkeypatch, tmp_path: Path, qapp):
+    source = tmp_path / "texture.png"
+    Image.new("RGB", (2, 2), (255, 0, 0)).save(source)
+    window = MainWindow()
+
+    monkeypatch.setattr("pixelator.gui.main_window.QFileDialog.getExistingDirectory", lambda *args: str(tmp_path))
+
+    window._choose_folder()
+
+    assert len(window.queue.jobs) == 1
+    assert window.queue.jobs[0].is_image
     window.close()
 
 
@@ -217,6 +266,126 @@ def test_output_path_uses_selected_output_format(tmp_path: Path, qapp):
     window.settings_panel.output_format_combo.setCurrentText("GIF")
 
     assert window._output_path_for_job(job) == tmp_path / "clip-pixelated.gif"
+    window.close()
+
+
+def test_output_path_for_image_job_uses_png(tmp_path: Path, qapp):
+    source = tmp_path / "texture.png"
+    job = VideoJob(source_path=source, media_type="image")
+    window = MainWindow()
+    window.settings_panel.output_folder_edit.setText(str(tmp_path))
+    window.settings_panel.output_format_combo.setCurrentText("GIF")
+
+    assert window._output_path_for_job(job) == tmp_path / "texture-pixelated.png"
+    assert window._settings_for_job(job).trim is None
+    assert window._settings_for_job(job).keep_audio is False
+    window.close()
+
+
+def test_uncustomized_jobs_share_global_render_settings(tmp_path: Path, qapp):
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    Image.new("RGB", (4, 4), (255, 0, 0)).save(first)
+    Image.new("RGB", (4, 4), (0, 0, 255)).save(second)
+    window = MainWindow()
+    window.add_media_paths([first, second])
+
+    window.settings_panel.pixel_scale_spin.setValue(8)
+
+    assert window.queue.jobs[0].settings_override is None
+    assert window.queue.jobs[1].settings_override is None
+    assert window._settings_for_job(window.queue.jobs[0]).pixel_scale == 8
+    assert window._settings_for_job(window.queue.jobs[1]).pixel_scale == 8
+    window.close()
+
+
+def test_customize_this_item_isolates_render_settings(tmp_path: Path, qapp):
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    Image.new("RGB", (4, 4), (255, 0, 0)).save(first)
+    Image.new("RGB", (4, 4), (0, 0, 255)).save(second)
+    window = MainWindow()
+    window.add_media_paths([first, second])
+
+    window._customize_selected_job_settings()
+    window.settings_panel.pixel_scale_spin.setValue(9)
+
+    assert window.queue.jobs[0].settings_override is not None
+    assert window.queue.jobs[0].settings_override.pixel_scale == 9
+    assert window._settings_for_job(window.queue.jobs[1]).pixel_scale == 4
+
+    window._use_global_settings_for_selected_job()
+
+    assert window.queue.jobs[0].settings_override is None
+    assert window.settings_panel.settings().pixel_scale == 4
+    window.close()
+
+
+def test_shared_palette_applies_to_all_jobs_by_default(tmp_path: Path, qapp):
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    Image.new("RGB", (4, 4), (255, 0, 0)).save(first)
+    Image.new("RGB", (4, 4), (0, 0, 255)).save(second)
+    window = MainWindow()
+    window.add_media_paths([first, second])
+
+    window.palette_panel.set_source_and_render_colors(["#000000", "#ffffff"])
+
+    assert window._settings_for_job(window.queue.jobs[0]).custom_palette == ["#000000", "#ffffff"]
+    assert window._settings_for_job(window.queue.jobs[1]).custom_palette == ["#000000", "#ffffff"]
+    window.close()
+
+
+def test_per_item_palette_snapshot_does_not_pollute_shared_palette(tmp_path: Path, qapp):
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    Image.new("RGB", (4, 4), (255, 0, 0)).save(first)
+    Image.new("RGB", (4, 4), (0, 0, 255)).save(second)
+    window = MainWindow()
+    window.add_media_paths([first, second])
+    window.palette_panel.set_source_and_render_colors(["#000000", "#ffffff"])
+
+    window.palette_panel.palette_mode_combo.setCurrentText("Per Item Palette")
+    window.palette_panel.set_colors(["#ff0000", "#00ff00"])
+    window.queue_panel.list_widget.setCurrentRow(1)
+
+    assert window.palette_panel.palette_mode() == "shared"
+    assert window.palette_panel.colors() == ["#000000", "#ffffff"]
+
+    window.queue_panel.list_widget.setCurrentRow(0)
+
+    assert window.palette_panel.palette_mode() == "item"
+    assert window.palette_panel.colors() == ["#ff0000", "#00ff00"]
+    window.close()
+
+
+def test_current_crop_palette_extract_uses_cropped_preview_region(tmp_path: Path, qapp):
+    source = tmp_path / "texture.png"
+    image = Image.new("RGB", (4, 2))
+    image.putdata([(255, 0, 0)] * 4 + [(0, 0, 255)] * 4)
+    image.save(source)
+    window = MainWindow()
+    window.add_media_paths([source])
+    window.preview_widget.set_crop(CropConfig(x=0, y=1, width=4, height=1))
+
+    window._extract_palette_from_current_frame(2, "dominant", "crop")
+
+    assert window.palette_panel.source_colors() == ["#0000ff"]
+    assert window.palette_panel.colors() == ["#0000ff"]
+    window.close()
+
+
+def test_image_crop_controls_preserve_odd_dimensions(tmp_path: Path, qapp):
+    source = tmp_path / "texture.png"
+    Image.new("RGB", (7, 5), (255, 0, 0)).save(source)
+
+    window = MainWindow()
+    window.add_media_paths([source])
+    window.crop_width_spin.setValue(3)
+    window.crop_height_spin.setValue(3)
+
+    assert window.queue.jobs[0].crop == CropConfig(x=0, y=0, width=3, height=3)
+    assert window.crop_dimensions_label.text() == "Output: 3 x 3"
     window.close()
 
 
@@ -256,7 +425,7 @@ def test_main_window_extracts_palette_from_current_preview_frame(monkeypatch, tm
 
     window = MainWindow()
     window.add_video_paths([source])
-    window._extract_palette_from_current_frame(2)
+    window._extract_palette_from_current_frame(2, "dominant", "full")
 
     assert window.palette_panel.colors() == ["#ff0000", "#00ff00"]
     settings = window._settings_for_job(window.queue.jobs[0])
@@ -269,7 +438,7 @@ def test_main_window_extracts_palette_from_current_preview_frame(monkeypatch, tm
 def test_main_window_current_frame_extract_without_preview_does_not_change_palette(qapp):
     window = MainWindow()
 
-    window._extract_palette_from_current_frame(2)
+    window._extract_palette_from_current_frame(2, "dominant", "full")
 
     assert window.palette_panel.colors() == []
     assert window.palette_panel.status_label.text() == "No current frame to extract"

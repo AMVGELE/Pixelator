@@ -1,6 +1,6 @@
 # Pixelator
 
-Pixelator converts source videos and GIFs into a light pixel-art style.
+Pixelator converts source videos, GIFs, and texture images into a light pixel-art style.
 
 ## Install
 
@@ -16,13 +16,17 @@ pixelator input.mp4 --mode stable --out output-stable.mp4
 pixelator input.mp4 --config presets/stable.yaml --out output-stable.mp4
 pixelator input.gif --mode fast --out output-from-gif.mp4
 pixelator input.mp4 --mode fast --out output.gif --no-audio
+pixelator texture.png --mode fast --out texture-pixelated.png
 ```
 
 `fast` mode is for quick parameter previews. `stable` mode is for final renders with
 reduced temporal color flicker.
 
-Output format is inferred from `--out`. Use `.mp4` for video output or `.gif`
-for animated GIF output. GIF output does not include audio.
+Output format is inferred from `--out`. Use `.mp4` for video output, `.gif`
+for animated GIF output, or an image extension such as `.png`, `.jpg`, `.webp`,
+`.bmp`, `.tga`, or `.tif` for texture output. GIF output does not include audio.
+Texture outputs preserve source alpha when saved as `.png`, `.webp`, `.tga`,
+`.tif`, or `.tiff`; use those formats for cutout sprites and transparent assets.
 
 ## Verification
 
@@ -34,6 +38,7 @@ pixelator outputs/sample.mp4 --mode fast --out outputs/sample-fast.mp4 --overwri
 pixelator outputs/sample.mp4 --mode stable --out outputs/sample-stable.mp4 --overwrite --no-audio
 pixelator outputs/sample.gif --mode fast --out outputs/sample-gif-input.mp4 --overwrite --no-audio
 pixelator outputs/sample.mp4 --mode fast --out outputs/sample-pixelated.gif --overwrite --no-audio
+pixelator outputs/sample.png --mode fast --out outputs/sample-pixelated.png --overwrite
 ```
 
 Use `fast` while tuning parameters, then render `stable` for final output.
@@ -101,10 +106,22 @@ pixelator-gui
 
 The desktop GUI provides a restrained workstation layout with a queue panel, preview
 area, render settings, trim controls, crop controls, and logs. It accepts common
-video files and GIFs, and it uses the same Pixelator pipeline as the CLI.
+video files, GIFs, and image/texture files, and it uses the same Pixelator
+pipeline as the CLI.
 
 Use the output format setting to choose MP4 or GIF for queued renders. MP4 remains
 the default. GIF output is silent because the GIF format has no audio track.
+Image jobs are written as `source-pixelated.png` so texture batches keep a
+lossless image output by default.
+
+Use Add to import individual videos, GIFs, or texture images. Use Folder to add
+all supported image files from a directory as a batch; unsupported files in that
+folder are ignored.
+
+Render settings are shared by default across the queue. Select a queued item and
+use `Customize This Item` when one resource needs its own pixel scale, color
+count, image adjustment, effects, or output format. `Use Global` returns that
+item to the shared default settings. Crop and trim remain per item.
 
 The right side of the GUI is split into Render and Palette tabs. Render keeps the
 automatic `Colors` count and output controls; Palette provides a Source -> Render
@@ -114,9 +131,17 @@ reference palette; Render is the palette that will actually be used for output.
 Palette Studio tools in the Palette tab can extract colors from the current
 preview frame or from an image file, save and load local presets, import local
 Lospec-style `.hex` or `.txt` files, and sort colors by brightness, hue, or
-saturation. Sorting organizes the Render palette view; AutoMatch uses perceptual
-color distance for actual pairing. Lospec support in this version is local file
-import only; it does not search or sync with the Lospec website.
+saturation. Extract supports dominant colors, balanced hue coverage, and tonal
+shadow/midtone/highlight sampling. Current-frame extraction can use the full
+frame or the current crop; image-file extraction always uses the full selected
+image. Sorting organizes the Render palette view; AutoMatch uses perceptual color
+distance for actual pairing. Lospec support in this version is local file import
+only; it does not search or sync with the Lospec website.
+
+Palette is shared by default, so a Render palette can be reused across many
+resources. Switch a selected item to `Per Item Palette` when it needs its own
+Source/Render snapshot; switching back to `Shared Palette` restores the shared
+palette context.
 
 Click Source and Render chips in the comparison board to inspect a pair. With
 AutoMatch enabled, extracting a new Source palette preserves the current Render
@@ -131,6 +156,8 @@ source frame without changing the trim range. Crop can be adjusted either by
 dragging the rectangle on the preview or by entering `X`, `Y`, `Width`, and
 `Height` values; the GUI shows the output size beside those controls. Odd crop
 widths or heights are snapped to even output dimensions for H.264 compatibility.
+Image jobs do not use the timeline and keep exact crop dimensions, including odd
+texture sizes.
 
 CRT and VHS are optional style effects. The default render is clean pixel art.
 VHS light uses low-frequency luminance variation instead of per-pixel color

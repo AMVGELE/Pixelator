@@ -18,6 +18,7 @@ class QueuePanel(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.add_button = QPushButton("Add")
+        self.folder_button = QPushButton("Folder")
         self.remove_button = QPushButton("Remove")
         self.start_button = QPushButton("Start")
         self.cancel_button = QPushButton("Cancel")
@@ -28,6 +29,7 @@ class QueuePanel(QWidget):
 
         action_row = QHBoxLayout()
         action_row.addWidget(self.add_button)
+        action_row.addWidget(self.folder_button)
         action_row.addWidget(self.remove_button)
 
         render_row = QHBoxLayout()
@@ -45,10 +47,11 @@ class QueuePanel(QWidget):
         self.list_widget.clear()
         for job in jobs:
             name = job.source_path.name
+            kind = "image" if job.is_image else "video"
             meta = ""
             if job.width and job.height:
                 meta = f" {job.width}x{job.height}"
-            item = QListWidgetItem(f"{name}{meta}\n{job.status.value} - {job.progress}%")
+            item = QListWidgetItem(f"{name}{meta} [{kind}]\n{job.status.value} - {job.progress}%")
             item.setData(Qt.ItemDataRole.UserRole, job.id)
             if job.error:
                 item.setToolTip(job.error)
