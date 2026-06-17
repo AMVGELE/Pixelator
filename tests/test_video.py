@@ -12,6 +12,7 @@ from pixelator.video import (
     frame_window,
     mux_audio,
     sample_frames,
+    write_gif,
     write_video,
 )
 
@@ -120,6 +121,27 @@ def test_write_video_includes_encoder_error_details(monkeypatch, tmp_path: Path)
 
     with pytest.raises(VideoError, match="width not divisible by 2"):
         write_video([Image.new("RGB", (3, 2), (0, 0, 0))], tmp_path / "out.mp4", VideoMetadata(3, 2, 24.0), "libx264")
+
+
+def test_write_gif_creates_animated_gif_with_frame_duration(tmp_path: Path):
+    output = tmp_path / "out.gif"
+    frames = [
+        Image.new("RGB", (3, 2), (255, 0, 0)),
+        Image.new("RGB", (3, 2), (0, 0, 255)),
+    ]
+
+    write_gif(frames, output, VideoMetadata(width=3, height=2, fps=12.0, duration=2 / 12.0))
+
+    with Image.open(output) as gif:
+        assert gif.format == "GIF"
+        assert gif.n_frames == 2
+        assert gif.info["duration"] == pytest.approx(83, abs=10)
+        assert gif.info["loop"] == 0
+
+
+def test_write_gif_rejects_empty_frames(tmp_path: Path):
+    with pytest.raises(VideoError, match="no frames"):
+        write_gif([], tmp_path / "out.gif", VideoMetadata(width=3, height=2, fps=12.0))
 
 
 def test_mux_audio_decodes_ffmpeg_output_with_replacement(monkeypatch, tmp_path: Path):

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from pixelator.config import CropConfig, TrimConfig
-from pixelator.gui.models import JobQueue, JobStatus, RenderSettings, VideoJob
+from pixelator.gui.models import JobQueue, JobStatus, PaletteSnapshot, RenderSettings, VideoJob
 
 
 def test_video_job_defaults_to_full_frame_and_full_trim(tmp_path: Path):
@@ -14,6 +14,32 @@ def test_video_job_defaults_to_full_frame_and_full_trim(tmp_path: Path):
     assert job.crop is None
     assert job.trim is None
     assert job.progress == 0
+    assert job.media_type == "video"
+    assert not job.is_image
+    assert job.settings_override is None
+    assert job.palette_mode == "shared"
+    assert job.palette_snapshot is None
+
+
+def test_image_job_marks_media_type(tmp_path: Path):
+    job = VideoJob(source_path=tmp_path / "texture.png", media_type="image")
+
+    assert job.is_image
+
+
+def test_palette_snapshot_carries_source_render_and_automatch_state():
+    snapshot = PaletteSnapshot(
+        source_colors=["#ff0000", "#0000ff"],
+        render_colors=["#1a1c2c", "#f4f4f4"],
+        auto_match=False,
+        match_sort="brightness",
+    )
+
+    assert snapshot.source_colors == ["#ff0000", "#0000ff"]
+    assert snapshot.render_colors == ["#1a1c2c", "#f4f4f4"]
+    assert snapshot.auto_match is False
+    assert snapshot.match_sort == "brightness"
+    assert snapshot.has_render_palette()
 
 
 def test_job_queue_tracks_status_transitions(tmp_path: Path):
@@ -88,3 +114,36 @@ def test_render_settings_create_config_with_crop_and_trim():
     assert config.output.overwrite is True
     assert config.crop == settings.crop
     assert config.trim == settings.trim
+
+
+def test_render_settings_default_output_format_is_mp4():
+    settings = RenderSettings()
+
+    assert settings.output_format == "mp4"
+    assert settings.crt == "off"
+    assert settings.vhs == "off"
+
+
+def test_render_settings_create_config_with_custom_palette():
+    settings = RenderSettings(custom_palette=["#000000", "#ffcc00"])
+
+    config = settings.to_config()
+
+    assert config.palette.strategy == "custom"
+    assert config.palette.custom_colors == ["#000000", "#ffcc00"]
+
+
+def test_render_settings_create_config_with_auto_match_palette():
+    settings = RenderSettings(
+        custom_palette=["#00ff00", "#ffff00"],
+        source_palette=["#ff0000", "#0000ff"],
+        palette_strategy="auto_match",
+        palette_match_sort="original",
+    )
+
+    config = settings.to_config()
+
+    assert config.palette.strategy == "auto_match"
+    assert config.palette.custom_colors == ["#00ff00", "#ffff00"]
+    assert config.palette.source_colors == ["#ff0000", "#0000ff"]
+    assert config.palette.match_sort == "original"

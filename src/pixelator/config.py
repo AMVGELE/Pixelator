@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from pixelator.errors import ConfigError
+from pixelator.palette_io import normalize_hex_color
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,9 @@ class PaletteConfig:
     strategy: str = "global_sampled"
     colors: int = 32
     sample_frames: int = 48
+    custom_colors: list[str] | None = None
+    source_colors: list[str] | None = None
+    match_sort: str = "hue_brightness"
 
 
 @dataclass(frozen=True)
@@ -45,10 +49,10 @@ class ImageConfig:
 
 @dataclass(frozen=True)
 class EffectsConfig:
-    crt: str = "subtle"
-    vhs: str = "light"
+    crt: str = "off"
+    vhs: str = "off"
     chroma_offset: int = 1
-    noise_amount: float = 0.018
+    noise_amount: float = 0.006
 
 
 @dataclass(frozen=True)
@@ -148,6 +152,34 @@ def validate_config(config: RenderConfig) -> None:
         raise ConfigError("palette.colors must be between 2 and 256")
     if config.palette.sample_frames < 1:
         raise ConfigError("palette.sample_frames must be at least 1")
+    if config.palette.match_sort not in {"original", "brightness", "hue", "hue_brightness", "saturation"}:
+        raise ConfigError("palette.match_sort must be original, brightness, hue, hue_brightness, or saturation")
+    if config.palette.strategy not in {"per_frame", "global_sampled", "custom", "auto_match"}:
+        raise ConfigError("palette.strategy must be 'per_frame', 'global_sampled', 'custom', or 'auto_match'")
+    if config.palette.strategy in {"custom", "auto_match"}:
+        if config.palette.custom_colors is None:
+            raise ConfigError("palette.custom_colors must contain 2 to 256 colors")
+        if not 2 <= len(config.palette.custom_colors) <= 256:
+            raise ConfigError("palette.custom_colors must contain 2 to 256 colors")
+        for color in config.palette.custom_colors:
+            try:
+                normalize_hex_color(color)
+            except ConfigError as exc:
+                raise ConfigError("palette.custom_colors must use #RRGGBB hex values") from exc
+    if config.palette.strategy == "auto_match":
+        if config.palette.source_colors is None:
+            raise ConfigError("palette.source_colors must contain 2 to 256 colors")
+        if not 2 <= len(config.palette.source_colors) <= 256:
+            raise ConfigError("palette.source_colors must contain 2 to 256 colors")
+        for color in config.palette.source_colors:
+            try:
+                normalize_hex_color(color)
+            except ConfigError as exc:
+                raise ConfigError("palette.source_colors must use #RRGGBB hex values") from exc
+    elif config.palette.source_colors is not None:
+        raise ConfigError("palette.source_colors requires palette.strategy 'auto_match'")
+    if config.palette.strategy not in {"custom", "auto_match"} and config.palette.custom_colors is not None:
+        raise ConfigError("palette.custom_colors requires palette.strategy 'custom' or 'auto_match'")
     if config.effects.crt not in {"off", "subtle"}:
         raise ConfigError("effects.crt must be 'off' or 'subtle'")
     if config.effects.vhs not in {"off", "light"}:

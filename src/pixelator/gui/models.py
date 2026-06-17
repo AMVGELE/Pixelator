@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 from uuid import uuid4
@@ -26,6 +26,17 @@ class JobStatus(StrEnum):
 
 
 @dataclass(frozen=True)
+class PaletteSnapshot:
+    source_colors: list[str] = field(default_factory=list)
+    render_colors: list[str] = field(default_factory=list)
+    auto_match: bool = True
+    match_sort: str = "hue_brightness"
+
+    def has_render_palette(self) -> bool:
+        return len(self.render_colors) >= 2
+
+
+@dataclass(frozen=True)
 class VideoJob:
     source_path: Path
     id: str = ""
@@ -39,10 +50,18 @@ class VideoJob:
     width: int | None = None
     height: int | None = None
     fps: float | None = None
+    media_type: str = "video"
+    settings_override: RenderSettings | None = None
+    palette_mode: str = "shared"
+    palette_snapshot: PaletteSnapshot | None = None
 
     def __post_init__(self) -> None:
         if not self.id:
             object.__setattr__(self, "id", uuid4().hex)
+
+    @property
+    def is_image(self) -> bool:
+        return self.media_type == "image"
 
 
 @dataclass(frozen=True)
@@ -53,18 +72,34 @@ class RenderSettings:
     brightness: float = 1.0
     sharpness: float = 1.2
     saturation: float = 1.1
-    crt: str = "subtle"
-    vhs: str = "light"
+    crt: str = "off"
+    vhs: str = "off"
     keep_audio: bool = True
     overwrite: bool = False
+    output_format: str = "mp4"
+    custom_palette: list[str] | None = None
+    source_palette: list[str] | None = None
+    palette_strategy: str = "custom"
+    palette_match_sort: str = "hue_brightness"
     crop: CropConfig | None = None
     trim: TrimConfig | None = None
 
     def to_config(self) -> RenderConfig:
+        palette = PaletteConfig(colors=self.colors)
+        if self.palette_strategy == "auto_match" and self.custom_palette and self.source_palette:
+            palette = PaletteConfig(
+                strategy="auto_match",
+                colors=self.colors,
+                custom_colors=self.custom_palette,
+                source_colors=self.source_palette,
+                match_sort=self.palette_match_sort,
+            )
+        elif self.custom_palette:
+            palette = PaletteConfig(strategy="custom", colors=self.colors, custom_colors=self.custom_palette)
         return RenderConfig(
             mode=self.mode,
             pixel=PixelConfig(scale=self.pixel_scale),
-            palette=PaletteConfig(colors=self.colors),
+            palette=palette,
             image=ImageConfig(
                 brightness=self.brightness,
                 sharpness=self.sharpness,

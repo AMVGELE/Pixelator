@@ -16,17 +16,22 @@ from PySide6.QtWidgets import (
     QSlider,
     QSpinBox,
     QSplitter,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
+from PIL import Image
 
 from pixelator.config import CropConfig, TrimConfig
 from pixelator.errors import PixelatorError
-from pixelator.gui.models import JobQueue, JobStatus, RenderSettings, VideoJob
+from pixelator.gui.models import JobQueue, JobStatus, PaletteSnapshot, RenderSettings, VideoJob
+from pixelator.gui.palette_panel import PalettePanel
 from pixelator.gui.preview import PreviewWidget, clamp_crop
 from pixelator.gui.queue_panel import QueuePanel
 from pixelator.gui.settings_panel import SettingsPanel
 from pixelator.gui.worker import RenderWorker
+from pixelator.image_io import load_static_image
+from pixelator.media import iter_image_files, is_image_path, is_video_path
 from pixelator.video import extract_frame, probe_video
 
 
@@ -36,11 +41,17 @@ class MainWindow(QMainWindow):
         self.queue = JobQueue()
         self._loading_job = False
         self._syncing_crop_controls = False
+        self._syncing_settings = False
+        self._syncing_palette_context = False
+        self._current_preview_frame: Image.Image | None = None
         self._active_thread: QThread | None = None
         self._active_worker: RenderWorker | None = None
         self.queue_panel = QueuePanel()
         self.settings_panel = SettingsPanel()
+        self.palette_panel = PalettePanel()
         self.preview_widget = PreviewWidget()
+        self._global_render_settings = self.settings_panel.settings()
+        self._shared_palette_snapshot = self.palette_panel.snapshot()
 
         self.trim_start_spin = QDoubleSpinBox()
         self.trim_start_spin.setRange(0.0, 24 * 60 * 60.0)
@@ -112,7 +123,11 @@ class MainWindow(QMainWindow):
         top_splitter = QSplitter(Qt.Orientation.Horizontal)
         top_splitter.addWidget(self.queue_panel)
         top_splitter.addWidget(preview_widget)
-        top_splitter.addWidget(self.settings_panel)
+
+        self.right_tabs = QTabWidget()
+        self.right_tabs.addTab(self.settings_panel, "Render")
+        self.right_tabs.addTab(self.palette_panel, "Palette")
+        top_splitter.addWidget(self.right_tabs)
         top_splitter.setSizes([260, 680, 320])
 
         main_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -130,9 +145,38 @@ class MainWindow(QMainWindow):
         self.log_view.appendPlainText(message)
 
     def add_video_paths(self, paths: list[str | Path]) -> None:
+        self.add_media_paths(paths)
+
+    def add_media_paths(self, paths: list[str | Path]) -> None:
         for raw_path in paths:
             path = Path(raw_path)
-            try:
+            if path.is_dir():
+                image_paths = iter_image_files(path)
+                if not image_paths:
+                    self.append_log(f"No supported image files found in {path}")
+                    continue
+                for image_path in image_paths:
+                    self._add_media_path(image_path)
+                continue
+            self._add_media_path(path)
+        self._refresh_queue()
+        if self.queue_panel.selected_job_id() is None and self.queue.jobs:
+            self.queue_panel.list_widget.setCurrentRow(0)
+
+    def _add_media_path(self, path: Path) -> None:
+        try:
+            if is_image_path(path):
+                frame = load_static_image(path)
+                job = VideoJob(
+                    source_path=path,
+                    width=frame.width,
+                    height=frame.height,
+                    media_type="image",
+                )
+                self.queue.add(job)
+                self.append_log(f"Added image {path.name}")
+                return
+            if is_video_path(path):
                 metadata = probe_video(path)
                 job = VideoJob(
                     source_path=path,
@@ -140,21 +184,28 @@ class MainWindow(QMainWindow):
                     width=metadata.width,
                     height=metadata.height,
                     fps=metadata.fps,
+                    media_type="video",
                 )
                 self.queue.add(job)
                 self.append_log(f"Added {path.name}")
-            except PixelatorError as exc:
-                self.append_log(f"Could not add {path}: {exc}")
-        self._refresh_queue()
-        if self.queue_panel.selected_job_id() is None and self.queue.jobs:
-            self.queue_panel.list_widget.setCurrentRow(0)
+                return
+            self.append_log(f"Unsupported media file: {path}")
+        except PixelatorError as exc:
+            self.append_log(f"Could not add {path}: {exc}")
 
     def _connect_signals(self) -> None:
         self.queue_panel.add_button.clicked.connect(self._choose_files)
+        self.queue_panel.folder_button.clicked.connect(self._choose_folder)
         self.queue_panel.remove_button.clicked.connect(self._remove_selected_job)
         self.queue_panel.start_button.clicked.connect(self._start_queue)
         self.queue_panel.cancel_button.clicked.connect(self._cancel_selected_job)
-        self.queue_panel.list_widget.currentItemChanged.connect(lambda current, previous: self._load_selected_job())
+        self.queue_panel.list_widget.currentItemChanged.connect(self._on_selected_job_changed)
+        self.settings_panel.settingsChanged.connect(self._on_settings_changed)
+        self.settings_panel.customize_button.clicked.connect(self._customize_selected_job_settings)
+        self.settings_panel.use_global_button.clicked.connect(self._use_global_settings_for_selected_job)
+        self.palette_panel.paletteChanged.connect(self._on_palette_changed)
+        self.palette_panel.paletteModeChanged.connect(self._on_palette_mode_changed)
+        self.palette_panel.extractCurrentFrameRequested.connect(self._extract_palette_from_current_frame)
         self.preview_widget.cropChanged.connect(self._on_crop_changed)
         self.trim_start_spin.valueChanged.connect(lambda value: self._on_trim_changed())
         self.trim_end_spin.valueChanged.connect(lambda value: self._on_trim_changed())
@@ -170,17 +221,28 @@ class MainWindow(QMainWindow):
     def _choose_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Add videos",
+            "Add media",
             "",
-            "Video files (*.mp4 *.mov *.mkv *.avi);;All files (*.*)",
+            (
+                "Media files (*.mp4 *.mov *.mkv *.avi *.gif *.png *.jpg *.jpeg *.webp *.bmp *.tga *.tif *.tiff);;"
+                "Video and GIF files (*.mp4 *.mov *.mkv *.avi *.gif);;"
+                "Image files (*.png *.jpg *.jpeg *.webp *.bmp *.tga *.tif *.tiff);;"
+                "All files (*.*)"
+            ),
         )
         if paths:
-            self.add_video_paths(paths)
+            self.add_media_paths(paths)
+
+    def _choose_folder(self) -> None:
+        selected = QFileDialog.getExistingDirectory(self, "Add image folder", "")
+        if selected:
+            self.add_media_paths([selected])
 
     def _remove_selected_job(self) -> None:
         selected = self.queue_panel.selected_job_id()
         if selected is None:
             return
+        self._save_palette_context(selected)
         self.queue.jobs = [job for job in self.queue.jobs if job.id != selected]
         self._refresh_queue()
 
@@ -197,6 +259,11 @@ class MainWindow(QMainWindow):
         self.queue.mark_cancelled(selected)
         self._refresh_queue()
 
+    def _on_selected_job_changed(self, current, previous) -> None:
+        previous_id = previous.data(Qt.ItemDataRole.UserRole) if previous is not None else None
+        self._save_palette_context(str(previous_id) if previous_id else None)
+        self._load_selected_job()
+
     def _load_selected_job(self) -> None:
         job_id = self.queue_panel.selected_job_id()
         job = self._job_by_id(job_id) if job_id else None
@@ -204,13 +271,29 @@ class MainWindow(QMainWindow):
             return
         self._loading_job = True
         try:
-            duration = job.duration or 0.0
-            self.trim_start_spin.setRange(0.0, max(duration, 0.001))
-            self.trim_end_spin.setRange(0.0, max(duration, 0.001))
-            self.trim_start_spin.setValue(job.trim.start if job.trim else 0.0)
-            self.trim_end_spin.setValue(job.trim.end if job.trim and job.trim.end is not None else duration)
-            preview_seconds = job.trim.start if job.trim else 0.0
-            self.scrubber_slider.setValue(self._slider_value_for_seconds(job, preview_seconds))
+            self._load_settings_context(job)
+            self._load_palette_context(job)
+            if job.is_image:
+                self.trim_start_spin.setEnabled(False)
+                self.trim_end_spin.setEnabled(False)
+                self.scrubber_slider.setEnabled(False)
+                self.trim_start_spin.setRange(0.0, 0.001)
+                self.trim_end_spin.setRange(0.0, 0.001)
+                self.trim_start_spin.setValue(0.0)
+                self.trim_end_spin.setValue(0.0)
+                self.scrubber_slider.setValue(0)
+                preview_seconds = 0.0
+            else:
+                self.trim_start_spin.setEnabled(True)
+                self.trim_end_spin.setEnabled(True)
+                self.scrubber_slider.setEnabled(True)
+                duration = job.duration or 0.0
+                self.trim_start_spin.setRange(0.0, max(duration, 0.001))
+                self.trim_end_spin.setRange(0.0, max(duration, 0.001))
+                self.trim_start_spin.setValue(job.trim.start if job.trim else 0.0)
+                self.trim_end_spin.setValue(job.trim.end if job.trim and job.trim.end is not None else duration)
+                preview_seconds = job.trim.start if job.trim else 0.0
+                self.scrubber_slider.setValue(self._slider_value_for_seconds(job, preview_seconds))
             self._load_preview_frame(job, preview_seconds, preserve_current_crop=False)
             self.statusBar().showMessage(str(job.source_path))
         except PixelatorError as exc:
@@ -232,6 +315,9 @@ class MainWindow(QMainWindow):
         job_id = self.queue_panel.selected_job_id()
         if job_id is None:
             return
+        job = self._job_by_id(job_id)
+        if job is None or job.is_image:
+            return
         start = self.trim_start_spin.value()
         end = self.trim_end_spin.value()
         if end <= start:
@@ -244,7 +330,7 @@ class MainWindow(QMainWindow):
         if self._loading_job:
             return
         job = self._job_by_id(self.queue_panel.selected_job_id())
-        if job is None:
+        if job is None or job.is_image:
             return
         seconds = self._scrubber_seconds(job)
         try:
@@ -258,6 +344,7 @@ class MainWindow(QMainWindow):
         source_size = self.preview_widget.source_size()
         if source_size is None:
             return
+        job = self._job_by_id(self.queue_panel.selected_job_id())
         crop = clamp_crop(
             CropConfig(
                 x=self.crop_x_spin.value(),
@@ -266,16 +353,21 @@ class MainWindow(QMainWindow):
                 height=self.crop_height_spin.value(),
             ),
             source_size,
+            encoder_safe=not (job and job.is_image),
         )
         self.preview_widget.set_crop(crop)
 
     def _scrubber_seconds(self, job: VideoJob) -> float:
+        if job.is_image:
+            return 0.0
         duration = job.duration or 0.0
         if duration <= 0:
             return 0.0
         return duration * (self.scrubber_slider.value() / 1000.0)
 
     def _slider_value_for_seconds(self, job: VideoJob, seconds: float) -> int:
+        if job.is_image:
+            return 0
         duration = job.duration or 0.0
         if duration <= 0:
             return 0
@@ -288,7 +380,9 @@ class MainWindow(QMainWindow):
         was_loading = self._loading_job
         self._loading_job = True
         try:
-            frame = extract_frame(job.source_path, seconds)
+            self.preview_widget.set_encoder_safe_crop(not job.is_image)
+            frame = load_static_image(job.source_path) if job.is_image else extract_frame(job.source_path, seconds)
+            self._current_preview_frame = frame.copy()
             self.preview_widget.set_image(frame)
             if previous_crop is not None:
                 self.preview_widget.set_crop(previous_crop)
@@ -297,6 +391,20 @@ class MainWindow(QMainWindow):
                 self._set_crop_controls_from_crop(crop)
         finally:
             self._loading_job = was_loading
+
+    def _extract_palette_from_current_frame(self, count: int, method: str, scope: str) -> None:
+        if self._current_preview_frame is None:
+            self.palette_panel.set_status_message("No current frame to extract")
+            return
+        frame = self._current_preview_frame
+        source_label = "current frame"
+        if scope == "crop":
+            crop = self.preview_widget.crop()
+            if crop is not None:
+                frame = frame.crop((crop.x, crop.y, crop.x + crop.width, crop.y + crop.height))
+                source_label = "current crop"
+        self.palette_panel.extract_from_image(frame, source_label, count, method)
+        self.right_tabs.setCurrentWidget(self.palette_panel)
 
     def _set_crop_controls_from_crop(self, crop: CropConfig) -> None:
         source_size = self.preview_widget.source_size()
@@ -370,13 +478,33 @@ class MainWindow(QMainWindow):
         thread.start()
 
     def _settings_for_job(self, job: VideoJob) -> RenderSettings:
-        settings = self.settings_panel.settings()
-        return replace(settings, crop=job.crop, trim=job.trim)
+        settings = job.settings_override or self._global_render_settings
+        palette_snapshot = self._palette_snapshot_for_job(job)
+        custom_palette = palette_snapshot.render_colors if len(palette_snapshot.render_colors) >= 2 else None
+        source_palette = (
+            palette_snapshot.source_colors
+            if palette_snapshot.auto_match
+            and len(palette_snapshot.source_colors) >= 2
+            and len(palette_snapshot.render_colors) >= 2
+            else None
+        )
+        palette_strategy = "auto_match" if custom_palette and source_palette else "custom"
+        return replace(
+            settings,
+            crop=job.crop,
+            trim=None if job.is_image else job.trim,
+            keep_audio=False if job.is_image else settings.keep_audio,
+            custom_palette=custom_palette,
+            source_palette=source_palette,
+            palette_strategy=palette_strategy,
+            palette_match_sort=palette_snapshot.match_sort,
+        )
 
     def _output_path_for_job(self, job: VideoJob) -> Path:
         output_dir = self.settings_panel.output_folder()
         output_dir.mkdir(parents=True, exist_ok=True)
-        return output_dir / f"{job.source_path.stem}-pixelated.mp4"
+        extension = "png" if job.is_image else self._settings_for_job(job).output_format
+        return output_dir / f"{job.source_path.stem}-pixelated.{extension}"
 
     def _on_worker_progress(self, job_id: str, progress: int) -> None:
         self.queue.mark_progress(job_id, progress)
@@ -411,6 +539,93 @@ class MainWindow(QMainWindow):
         if job_id is None:
             return None
         return next((job for job in self.queue.jobs if job.id == job_id), None)
+
+    def _load_settings_context(self, job: VideoJob) -> None:
+        settings = job.settings_override or self._global_render_settings
+        self._syncing_settings = True
+        try:
+            self.settings_panel.set_settings(settings)
+            self.settings_panel.set_settings_scope(customized=job.settings_override is not None)
+        finally:
+            self._syncing_settings = False
+
+    def _on_settings_changed(self) -> None:
+        if self._syncing_settings or self._loading_job:
+            return
+        settings = self.settings_panel.settings()
+        job = self._job_by_id(self.queue_panel.selected_job_id())
+        if job is not None and job.settings_override is not None:
+            self.queue.update(job.id, settings_override=settings)
+            return
+        self._global_render_settings = settings
+
+    def _customize_selected_job_settings(self) -> None:
+        job = self._job_by_id(self.queue_panel.selected_job_id())
+        if job is None:
+            return
+        settings = self.settings_panel.settings()
+        self.queue.update(job.id, settings_override=settings)
+        self.settings_panel.set_settings_scope(customized=True)
+        self._refresh_queue()
+
+    def _use_global_settings_for_selected_job(self) -> None:
+        job = self._job_by_id(self.queue_panel.selected_job_id())
+        if job is None:
+            return
+        self.queue.update(job.id, settings_override=None)
+        self._load_settings_context(self.queue.jobs[self._job_index(job.id)])
+        self._refresh_queue()
+
+    def _load_palette_context(self, job: VideoJob) -> None:
+        self._syncing_palette_context = True
+        try:
+            self.palette_panel.set_palette_mode(job.palette_mode)
+            self.palette_panel.load_snapshot(self._palette_snapshot_for_job(job))
+        finally:
+            self._syncing_palette_context = False
+
+    def _palette_snapshot_for_job(self, job: VideoJob) -> PaletteSnapshot:
+        if job.palette_mode == "item" and job.palette_snapshot is not None:
+            return job.palette_snapshot
+        return self._shared_palette_snapshot
+
+    def _save_palette_context(self, job_id: str | None = None) -> None:
+        if self._syncing_palette_context:
+            return
+        job = self._job_by_id(job_id) if job_id is not None else self._job_by_id(self.queue_panel.selected_job_id())
+        snapshot = self.palette_panel.snapshot()
+        if job is not None and job.palette_mode == "item":
+            self.queue.update(job.id, palette_snapshot=snapshot)
+            return
+        self._shared_palette_snapshot = snapshot
+
+    def _on_palette_changed(self) -> None:
+        if self._syncing_palette_context:
+            return
+        self._save_palette_context()
+
+    def _on_palette_mode_changed(self, mode: str) -> None:
+        if self._syncing_palette_context:
+            return
+        job = self._job_by_id(self.queue_panel.selected_job_id())
+        if job is None:
+            self.palette_panel.set_palette_mode("shared")
+            return
+        if mode == "item":
+            self.queue.update(job.id, palette_mode="item", palette_snapshot=self.palette_panel.snapshot())
+            self._refresh_queue()
+            return
+        if job.palette_mode == "item":
+            self.queue.update(job.id, palette_snapshot=self.palette_panel.snapshot())
+        updated = self.queue.update(job.id, palette_mode="shared")
+        self._load_palette_context(updated)
+        self._refresh_queue()
+
+    def _job_index(self, job_id: str) -> int:
+        for index, job in enumerate(self.queue.jobs):
+            if job.id == job_id:
+                return index
+        raise KeyError(job_id)
 
     def _apply_style(self) -> None:
         self.setStyleSheet(

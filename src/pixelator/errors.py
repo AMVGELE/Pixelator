@@ -10,5 +10,13 @@ class VideoError(PixelatorError):
     """Raised when video probing, decoding, encoding, or muxing fails."""
 
 
+class ImageError(PixelatorError):
+    """Raised when image loading or writing fails."""
+
+
+class MediaError(PixelatorError):
+    """Raised when a source media type is not supported."""
+
+
 class OutputError(PixelatorError):
     """Raised when output paths are invalid or unsafe."""

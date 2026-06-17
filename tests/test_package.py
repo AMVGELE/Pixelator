@@ -4,7 +4,7 @@ from pixelator import __version__
 
 
 def test_package_exposes_version():
-    assert __version__ == "0.1.0"
+    assert __version__ == "1.1.5"
 
 
 def test_windows_package_script_exists_and_uses_pyinstaller():

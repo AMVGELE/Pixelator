@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Iterable, Iterator
@@ -8,17 +9,28 @@ from PIL import Image
 
 from pixelator.config import RenderConfig
 from pixelator.effects import apply_effects
-from pixelator.errors import VideoError
+from pixelator.errors import ImageError, MediaError, VideoError
+from pixelator.image_io import load_static_image, save_static_image
 from pixelator.image_ops import adjust_frame, pixelate_frame
-from pixelator.palette import apply_palette, build_global_palette, quantize_per_frame
+from pixelator.media import is_image_path, is_video_path
+from pixelator.palette import (
+    apply_auto_match_palette,
+    apply_palette,
+    auto_match_palette,
+    build_global_palette,
+    custom_palette,
+    quantize_per_frame,
+)
 from pixelator.video import (
     VideoMetadata,
     ensure_output_path,
     frame_window,
     iter_frames,
+    is_gif_path,
     mux_audio,
     probe_video,
     sample_frames,
+    write_gif,
     write_video,
 )
 
@@ -27,6 +39,7 @@ def prepare_source_frames(
     frames: Iterable[Image.Image],
     config: RenderConfig,
     metadata: VideoMetadata,
+    encoder_safe: bool = True,
 ) -> tuple[list[Image.Image], VideoMetadata]:
     frame_list = list(frames)
     if config.trim is not None:
@@ -48,7 +61,8 @@ def prepare_source_frames(
             raise VideoError("Crop rectangle is outside the source frame")
         frame_list = [frame.crop((left, upper, right, lower)) for frame in frame_list]
         metadata = VideoMetadata(width=right - left, height=lower - upper, fps=metadata.fps, duration=metadata.duration)
-    frame_list, metadata = _make_frames_encoder_safe(frame_list, metadata)
+    if encoder_safe:
+        frame_list, metadata = _make_frames_encoder_safe(frame_list, metadata)
     return frame_list, metadata
 
 
@@ -78,8 +92,10 @@ def process_frames(
     metadata: VideoMetadata,
 ) -> Iterator[Image.Image]:
     frame_list = list(frames)
+    explicit_palette = custom_palette(config.palette)
+    auto_match = auto_match_palette(config.palette)
     palette = None
-    if config.mode == "stable":
+    if explicit_palette is None and auto_match is None and config.mode == "stable":
         samples = sample_frames(frame_list, config.palette.sample_frames)
         adjusted_samples = [adjust_frame(pixelate_frame(frame, config.pixel), config.image) for frame in samples]
         palette = build_global_palette(adjusted_samples, config.palette)
@@ -87,11 +103,16 @@ def process_frames(
     for index, frame in enumerate(frame_list):
         result = pixelate_frame(frame, config.pixel)
         result = adjust_frame(result, config.image)
-        if config.mode == "stable" and palette is not None:
+        if explicit_palette is None and auto_match is None and config.mode == "stable" and palette is not None:
             result = apply_palette(result, palette)
-        else:
+        elif explicit_palette is None and auto_match is None:
             result = quantize_per_frame(result, config.palette)
         result = apply_effects(result, config.effects, frame_index=index)
+        if explicit_palette is not None:
+            result = apply_palette(result, explicit_palette)
+        elif auto_match is not None:
+            source_colors, target_colors, sort_mode = auto_match
+            result = apply_auto_match_palette(result, source_colors, target_colors, sort_mode)
         if result.size != metadata.size:
             result = result.resize(metadata.size, Image.Resampling.NEAREST)
         yield result
@@ -103,15 +124,22 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
         raise VideoError(f"Input video does not exist: {input_file}")
 
     final_output = ensure_output_path(output_path, overwrite=config.output.overwrite)
+    output_is_gif = is_gif_path(final_output)
+    input_is_gif = is_gif_path(input_file)
     metadata = probe_video(input_file)
     frames = list(iter_frames(input_file))
-    frames, metadata = prepare_source_frames(frames, config, metadata)
+    frames, metadata = prepare_source_frames(frames, config, metadata, encoder_safe=not output_is_gif)
+
+    if output_is_gif:
+        processed = process_frames(frames, config, metadata)
+        write_gif(processed, final_output, metadata)
+        return final_output
 
     with TemporaryDirectory(prefix="pixelator-") as temp_dir:
         silent_output = Path(temp_dir) / f"{final_output.stem}.silent.mp4"
         processed = process_frames(frames, config, metadata)
         write_video(processed, silent_output, metadata, codec=config.output.codec)
-        if config.output.keep_audio:
+        if config.output.keep_audio and not input_is_gif:
             try:
                 trim_start = config.trim.start if config.trim is not None else 0.0
                 trim_duration = metadata.duration if config.trim is not None else None
@@ -124,3 +152,63 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
             final_output.write_bytes(silent_output.read_bytes())
 
     return final_output
+
+
+def render_image(input_path: str | Path, output_path: str | Path, config: RenderConfig) -> Path:
+    input_file = Path(input_path)
+    if not input_file.exists():
+        raise ImageError(f"Input image does not exist: {input_file}")
+    if not is_image_path(input_file):
+        raise ImageError(f"Unsupported image input format: {input_file.suffix}")
+
+    final_output = ensure_output_path(output_path, overwrite=config.output.overwrite)
+    image = load_static_image(input_file)
+    alpha = image.getchannel("A").copy() if "A" in image.getbands() else None
+    rgb_image = image.convert("RGB")
+    image_config = replace(config, trim=None)
+    source_metadata = VideoMetadata(width=image.width, height=image.height, fps=1.0, duration=None)
+    frames, metadata = prepare_source_frames([rgb_image], image_config, source_metadata, encoder_safe=False)
+    alpha = _prepare_image_alpha(alpha, image_config, source_metadata)
+    processed = list(process_frames(frames, image_config, metadata))
+    if not processed:
+        raise ImageError(f"Could not render image: {input_file}")
+    result = _apply_image_alpha(processed[0], alpha)
+    save_static_image(result, final_output)
+    return final_output
+
+
+def _prepare_image_alpha(
+    alpha: Image.Image | None,
+    config: RenderConfig,
+    metadata: VideoMetadata,
+) -> Image.Image | None:
+    if alpha is None:
+        return None
+    if config.crop is None:
+        return alpha
+    left = config.crop.x
+    upper = config.crop.y
+    right = min(metadata.width, left + config.crop.width)
+    lower = min(metadata.height, upper + config.crop.height)
+    if right <= left or lower <= upper:
+        raise VideoError("Crop rectangle is outside the source frame")
+    return alpha.crop((left, upper, right, lower))
+
+
+def _apply_image_alpha(image: Image.Image, alpha: Image.Image | None) -> Image.Image:
+    if alpha is None:
+        return image
+    result = image.convert("RGBA")
+    if alpha.size != result.size:
+        alpha = alpha.resize(result.size, Image.Resampling.NEAREST)
+    result.putalpha(alpha)
+    return result
+
+
+def render_media(input_path: str | Path, output_path: str | Path, config: RenderConfig) -> Path:
+    input_file = Path(input_path)
+    if is_image_path(input_file):
+        return render_image(input_file, output_path, config)
+    if is_video_path(input_file):
+        return render_video(input_file, output_path, config)
+    raise MediaError(f"Unsupported input media type: {input_file.suffix or input_file}")
