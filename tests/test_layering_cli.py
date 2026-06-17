@@ -1,5 +1,6 @@
 import importlib
 import json
+import os
 import subprocess
 import sys
 import tomllib
@@ -12,6 +13,18 @@ from pixelator.layering.archive import write_layer_zip
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = PROJECT_ROOT / "src"
+
+
+def _subprocess_env() -> dict[str, str]:
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        str(SOURCE_ROOT)
+        if not existing_pythonpath
+        else str(SOURCE_ROOT) + os.pathsep + existing_pythonpath
+    )
+    return env
 
 
 class FakeClient:
@@ -42,12 +55,13 @@ def test_layering_cli_module_prints_root_help():
     result = subprocess.run(
         [sys.executable, "-m", "pixelator.layering.cli", "--help"],
         cwd=PROJECT_ROOT,
+        env=_subprocess_env(),
         capture_output=True,
         text=True,
         check=False,
     )
 
-    assert result.returncode == 0
+    assert result.returncode == 0, result.stderr or result.stdout
     assert "pixelator-layer" in result.stdout
     assert "split" in result.stdout
 
@@ -56,12 +70,13 @@ def test_layering_cli_module_prints_split_help():
     result = subprocess.run(
         [sys.executable, "-m", "pixelator.layering.cli", "split", "--help"],
         cwd=PROJECT_ROOT,
+        env=_subprocess_env(),
         capture_output=True,
         text=True,
         check=False,
     )
 
-    assert result.returncode == 0
+    assert result.returncode == 0, result.stderr or result.stdout
     assert "--endpoint" in result.stdout
     assert "--api-key-env" in result.stdout
     assert "--layers" in result.stdout
