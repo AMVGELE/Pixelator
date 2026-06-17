@@ -179,6 +179,8 @@ class LayerManifest:
         self.source.to_dict()
         self.model.to_dict()
         self.preview.to_dict()
+        if not isinstance(self.layers, list):
+            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest layers must be a list")
         if not self.layers:
             raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest must contain at least one layer")
         seen_files: set[str] = set()

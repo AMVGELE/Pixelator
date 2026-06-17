@@ -202,6 +202,16 @@ def test_manifest_to_dict_rejects_wrong_metadata_object_types(override):
     _assert_artifact_invalid(exc_info)
 
 
+@pytest.mark.parametrize("layers", [1, "bad"])
+def test_manifest_to_dict_rejects_malformed_layer_collection(layers):
+    manifest = _manifest(layers=layers)
+
+    with pytest.raises(LayeringError) as exc_info:
+        manifest.to_dict()
+
+    _assert_artifact_invalid(exc_info)
+
+
 @pytest.mark.parametrize("bbox", [[-1, 6, 32, 40], [4, 6, 0, 40]])
 def test_manifest_from_dict_rejects_invalid_bbox_geometry(bbox):
     data = _manifest_data(layers=[_layer_data(bbox=bbox)])
