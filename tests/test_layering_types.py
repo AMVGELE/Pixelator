@@ -138,6 +138,23 @@ def test_manifest_to_dict_rejects_invalid_layer_fields(field, value):
     _assert_artifact_invalid(exc_info)
 
 
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"source": SourceInfo(file_name="hero.png", width=0, height=64, sha256="abc")},
+        {"model": ModelInfo(provider="", backend="mock", model_id="mock")},
+        {"preview": PreviewInfo(file="")},
+    ],
+)
+def test_manifest_to_dict_rejects_invalid_metadata_fields(override):
+    manifest = _manifest(**override)
+
+    with pytest.raises(LayeringError) as exc_info:
+        manifest.to_dict()
+
+    _assert_artifact_invalid(exc_info)
+
+
 def test_manifest_rejects_duplicate_layer_file():
     data = _manifest_data(
         layers=[

@@ -39,7 +39,12 @@ class SourceInfo:
     sha256: str
 
     def to_dict(self) -> dict[str, Any]:
-        return {"file_name": self.file_name, "width": self.width, "height": self.height, "sha256": self.sha256}
+        return {
+            "file_name": _require_str({"file_name": self.file_name}, "file_name"),
+            "width": _require_positive_int({"width": self.width}, "width"),
+            "height": _require_positive_int({"height": self.height}, "height"),
+            "sha256": _require_str({"sha256": self.sha256}, "sha256"),
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SourceInfo":
@@ -58,7 +63,11 @@ class ModelInfo:
     model_id: str
 
     def to_dict(self) -> dict[str, Any]:
-        return {"provider": self.provider, "backend": self.backend, "model_id": self.model_id}
+        return {
+            "provider": _require_str({"provider": self.provider}, "provider"),
+            "backend": _require_str({"backend": self.backend}, "backend"),
+            "model_id": _require_str({"model_id": self.model_id}, "model_id"),
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModelInfo":
@@ -119,7 +128,7 @@ class PreviewInfo:
     file: str
 
     def to_dict(self) -> dict[str, Any]:
-        return {"file": self.file}
+        return {"file": _require_str({"file": self.file}, "file")}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PreviewInfo":
