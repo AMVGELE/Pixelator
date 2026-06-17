@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import http.client
 import json
 import mimetypes
-import select
-import socket
 import time
 import uuid
 from pathlib import Path
@@ -15,9 +12,6 @@ from urllib.request import Request, urlopen
 
 from pixelator.layering.archive import validate_layer_zip
 from pixelator.layering.types import ErrorCode, JobStatus, LayerManifest, LayeringError
-
-
-_EARLY_RESPONSE_WAIT_SECONDS = 0.05
 
 
 class LayerSplitClient:
@@ -66,10 +60,7 @@ class LayerSplitClient:
             "POST",
             "/v1/layer-splits",
             body=body,
-            headers={
-                "Content-Type": multipart_type,
-                "Expect": "100-continue",
-            },
+            headers={"Content-Type": multipart_type},
         )
         job_id = response.get("job_id")
         if not isinstance(job_id, str) or not job_id:
@@ -106,17 +97,29 @@ class LayerSplitClient:
     def download_artifact(self, artifact_url: str, output_path: str | Path) -> Path:
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
 
-        request = self._request("GET", self._resolve_url(artifact_url), headers={"Accept": "application/zip"})
+        resolved_url = self._resolve_url(artifact_url)
+        headers = {"Accept": "application/zip"}
+        if self._should_authorize_artifact_url(artifact_url):
+            request = self._request("GET", resolved_url, headers=headers)
+        else:
+            request = Request(resolved_url, headers=headers, method="GET")
         try:
             with urlopen(request, timeout=self.timeout) as response:
-                destination.write_bytes(response.read())
+                temporary.write_bytes(response.read())
+            validate_layer_zip(temporary)
+            temporary.replace(destination)
         except HTTPError as exc:
+            _unlink_if_exists(temporary)
             raise _http_error(exc) from exc
+        except LayeringError:
+            _unlink_if_exists(temporary)
+            raise
         except (OSError, URLError) as exc:
+            _unlink_if_exists(temporary)
             raise LayeringError(ErrorCode.JOB_FAILED, f"failed to download layer artifact: {exc}") from exc
 
-        validate_layer_zip(destination)
         return destination
 
     def _request_json(
@@ -126,19 +129,19 @@ class LayerSplitClient:
         body: bytes | None = None,
         headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        url = self._resolve_url(path)
-        request_headers = {"Accept": "application/json", **(headers or {})}
-        if method == "POST" and body is not None and request_headers.get("Expect") == "100-continue":
-            data = self._post_with_continue(url, body, request_headers)
-        else:
-            request = self._request(method, url, body=body, headers=request_headers)
-            try:
-                with urlopen(request, timeout=self.timeout) as response:
-                    data = response.read()
-            except HTTPError as exc:
-                raise _http_error(exc) from exc
-            except (OSError, URLError) as exc:
-                raise LayeringError(ErrorCode.JOB_FAILED, f"layer split request failed: {exc}") from exc
+        request = self._request(
+            method,
+            self._resolve_url(path),
+            body=body,
+            headers={"Accept": "application/json", **(headers or {})},
+        )
+        try:
+            with urlopen(request, timeout=self.timeout) as response:
+                data = response.read()
+        except HTTPError as exc:
+            raise _http_error(exc) from exc
+        except (OSError, URLError) as exc:
+            raise LayeringError(ErrorCode.JOB_FAILED, f"layer split request failed: {exc}") from exc
 
         if not data:
             return {}
@@ -171,50 +174,11 @@ class LayerSplitClient:
             return url_or_path
         return urljoin(f"{self.endpoint}/", url_or_path)
 
-    def _post_with_continue(self, url: str, body: bytes, headers: dict[str, str]) -> bytes:
-        parsed = urlparse(url)
-        if parsed.scheme not in {"http", "https"} or parsed.hostname is None:
-            raise LayeringError(ErrorCode.JOB_FAILED, f"unsupported layer split endpoint: {url}")
-
-        connection_type = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
-        path = parsed.path or "/"
-        if parsed.query:
-            path = f"{path}?{parsed.query}"
-
-        request_headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            **headers,
-            "Content-Length": str(len(body)),
-            "Connection": "close",
-        }
-        connection = connection_type(parsed.hostname, port=parsed.port, timeout=self.timeout)
-
-        try:
-            connection.putrequest("POST", path)
-            for name, value in request_headers.items():
-                connection.putheader(name, value)
-            connection.endheaders()
-
-            sock = connection.sock
-            if sock is None:
-                raise LayeringError(ErrorCode.JOB_FAILED, "layer split connection was not opened")
-            early_response_wait = min(_EARLY_RESPONSE_WAIT_SECONDS, max(0.0, self.timeout))
-            if not _socket_has_early_response(sock, early_response_wait):
-                sock.sendall(body)
-            elif _peek_status_is_continue(sock):
-                sock.sendall(body)
-
-            response = connection.getresponse()
-            data = response.read()
-            if response.status >= 400:
-                raise _status_error(response.status, response.reason, response.headers, data)
-            return data
-        except LayeringError:
-            raise
-        except (OSError, http.client.HTTPException) as exc:
-            raise LayeringError(ErrorCode.JOB_FAILED, f"layer split request failed: {exc}") from exc
-        finally:
-            connection.close()
+    def _should_authorize_artifact_url(self, url_or_path: str) -> bool:
+        parsed = urlparse(url_or_path)
+        if not parsed.scheme and not parsed.netloc:
+            return True
+        return _origin(urlparse(self.endpoint)) == _origin(parsed)
 
 
 def _multipart_body(
@@ -311,20 +275,22 @@ def _escape_header(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _socket_has_early_response(sock: socket.socket | None, wait_seconds: float) -> bool:
-    if sock is None:
-        return False
-    readable, _, _ = select.select([sock], [], [], wait_seconds)
-    return bool(readable)
+def _origin(parsed: Any) -> tuple[str, str, int | None]:
+    return (parsed.scheme.lower(), (parsed.hostname or "").lower(), _effective_port(parsed))
 
 
-def _peek_status_is_continue(sock: socket.socket | None) -> bool:
-    if sock is None:
-        return False
+def _effective_port(parsed: Any) -> int | None:
+    if parsed.port is not None:
+        return parsed.port
+    if parsed.scheme == "http":
+        return 80
+    if parsed.scheme == "https":
+        return 443
+    return None
+
+
+def _unlink_if_exists(path: Path) -> None:
     try:
-        data = sock.recv(64, socket.MSG_PEEK)
+        path.unlink(missing_ok=True)
     except OSError:
-        return False
-    status_line = data.split(b"\r\n", 1)[0]
-    parts = status_line.split(None, 2)
-    return len(parts) >= 2 and parts[1] == b"100"
+        return
