@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin, urlparse
-from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from pixelator.layering.archive import validate_layer_zip
 from pixelator.layering.types import ErrorCode, JobStatus, LayerManifest, LayeringError
@@ -107,7 +107,13 @@ class LayerSplitClient:
         else:
             request = Request(resolved_url, headers=headers, method="GET")
         try:
-            opener = build_opener(_ArtifactRedirectHandler(urlparse(self.endpoint), authorize_artifact))
+            opener = build_opener(
+                _EndpointRedirectHandler(
+                    endpoint=urlparse(self.endpoint),
+                    reject_cross_origin=authorize_artifact,
+                    message="cross-origin artifact redirect rejected",
+                )
+            )
             with opener.open(request, timeout=self.timeout) as response:
                 temporary.write_bytes(response.read())
             validate_layer_zip(temporary)
@@ -138,7 +144,14 @@ class LayerSplitClient:
             headers={"Accept": "application/json", **(headers or {})},
         )
         try:
-            with urlopen(request, timeout=self.timeout) as response:
+            opener = build_opener(
+                _EndpointRedirectHandler(
+                    endpoint=urlparse(self.endpoint),
+                    reject_cross_origin=True,
+                    message="cross-origin API redirect rejected",
+                )
+            )
+            with opener.open(request, timeout=self.timeout) as response:
                 data = response.read()
         except HTTPError as exc:
             raise _http_error(exc) from exc
@@ -213,15 +226,16 @@ def _multipart_body(
     return b"".join(chunks), f"multipart/form-data; boundary={boundary}"
 
 
-class _ArtifactRedirectHandler(HTTPRedirectHandler):
-    def __init__(self, endpoint: Any, request_authorized: bool) -> None:
+class _EndpointRedirectHandler(HTTPRedirectHandler):
+    def __init__(self, endpoint: Any, reject_cross_origin: bool, message: str) -> None:
         self.endpoint_origin = _origin(endpoint)
-        self.request_authorized = request_authorized
+        self.reject_cross_origin = reject_cross_origin
+        self.message = message
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         redirect_url = urljoin(req.full_url, newurl)
-        if self.request_authorized and _origin(urlparse(redirect_url)) != self.endpoint_origin:
-            raise LayeringError(ErrorCode.JOB_FAILED, "cross-origin artifact redirect rejected")
+        if self.reject_cross_origin and _origin(urlparse(redirect_url)) != self.endpoint_origin:
+            raise LayeringError(ErrorCode.JOB_FAILED, self.message)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 

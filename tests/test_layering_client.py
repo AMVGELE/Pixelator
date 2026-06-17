@@ -402,6 +402,69 @@ def test_authorized_artifact_download_rejects_cross_origin_redirect(tmp_path: Pa
     assert RedirectTargetHandler.observed_authorization is None
 
 
+def test_authenticated_status_poll_rejects_cross_origin_redirect():
+    class RedirectTargetHandler(BaseHTTPRequestHandler):
+        request_count = 0
+        observed_authorization: str | None = None
+
+        def do_GET(self):
+            self.__class__.request_count += 1
+            self.__class__.observed_authorization = self.headers.get("Authorization")
+            body = json.dumps(
+                {
+                    "job_id": "job_123",
+                    "status": "succeeded",
+                    "artifact_url": "/artifact.zip",
+                    "error": None,
+                }
+            ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format, *args):
+            return
+
+    class RedirectingStatusHandler(BaseHTTPRequestHandler):
+        redirect_url: str
+
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", self.__class__.redirect_url)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, format, *args):
+            return
+
+    RedirectTargetHandler.request_count = 0
+    RedirectTargetHandler.observed_authorization = None
+    target_server = ThreadingHTTPServer(("127.0.0.1", 0), RedirectTargetHandler)
+    target_thread = threading.Thread(target=target_server.serve_forever, daemon=True)
+    target_thread.start()
+    RedirectingStatusHandler.redirect_url = f"http://127.0.0.1:{target_server.server_port}/v1/layer-splits/job_123"
+
+    api_server = ThreadingHTTPServer(("127.0.0.1", 0), RedirectingStatusHandler)
+    api_thread = threading.Thread(target=api_server.serve_forever, daemon=True)
+    api_thread.start()
+
+    try:
+        client = LayerSplitClient(endpoint=f"http://127.0.0.1:{api_server.server_port}", api_key="secret")
+        with pytest.raises(LayeringError) as exc_info:
+            client.wait_for_artifact("job_123")
+    finally:
+        api_server.shutdown()
+        api_thread.join(timeout=2)
+        target_server.shutdown()
+        target_thread.join(timeout=2)
+
+    assert exc_info.value.code == ErrorCode.JOB_FAILED
+    assert RedirectTargetHandler.request_count == 0
+    assert RedirectTargetHandler.observed_authorization is None
+
+
 def test_invalid_downloaded_artifact_preserves_previous_valid_output(tmp_path: Path):
     class InvalidArtifactHandler(BaseHTTPRequestHandler):
         def do_GET(self):
