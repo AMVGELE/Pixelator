@@ -82,33 +82,35 @@ class LayerInfo:
     blend_mode: str = "normal"
 
     def to_dict(self) -> dict[str, Any]:
+        bbox = _require_bbox(self.bbox)
+        opacity = _require_opacity(self.opacity)
+        blend_mode = _require_str({"blend_mode": self.blend_mode}, "blend_mode")
         return {
-            "id": self.id,
-            "name": self.name,
-            "file": self.file,
-            "order": self.order,
-            "bbox": list(self.bbox),
-            "width": self.width,
-            "height": self.height,
-            "opacity": self.opacity,
-            "blend_mode": self.blend_mode,
+            "id": _require_str({"id": self.id}, "id"),
+            "name": _require_str({"name": self.name}, "name"),
+            "file": _require_str({"file": self.file}, "file"),
+            "order": _require_non_negative_int({"order": self.order}, "order"),
+            "bbox": list(bbox),
+            "width": _require_positive_int({"width": self.width}, "width"),
+            "height": _require_positive_int({"height": self.height}, "height"),
+            "opacity": opacity,
+            "blend_mode": blend_mode,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LayerInfo":
-        bbox_value = data.get("bbox")
-        if not isinstance(bbox_value, list) or len(bbox_value) != 4 or not all(isinstance(value, int) for value in bbox_value):
-            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "layer bbox must contain four integers")
+        if not isinstance(data, dict):
+            raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest field layer must be an object")
         return cls(
             id=_require_str(data, "id"),
             name=_require_str(data, "name"),
             file=_require_str(data, "file"),
             order=_require_non_negative_int(data, "order"),
-            bbox=(bbox_value[0], bbox_value[1], bbox_value[2], bbox_value[3]),
+            bbox=_require_bbox(data.get("bbox")),
             width=_require_positive_int(data, "width"),
             height=_require_positive_int(data, "height"),
-            opacity=float(data.get("opacity", 1.0)),
-            blend_mode=str(data.get("blend_mode", "normal")),
+            opacity=_require_opacity(data.get("opacity", 1.0)),
+            blend_mode=_require_str({"blend_mode": data.get("blend_mode", "normal")}, "blend_mode"),
         )
 
 
@@ -164,13 +166,16 @@ class LayerManifest:
             raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest must contain at least one layer")
         seen_files: set[str] = set()
         for layer in self.layers:
+            if not isinstance(layer, LayerInfo):
+                raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest layers must contain layer objects")
+            layer.to_dict()
             if layer.file in seen_files:
                 raise LayeringError(ErrorCode.ARTIFACT_INVALID, f"duplicate layer file: {layer.file}")
             seen_files.add(layer.file)
 
 
-def _require_dict(data: dict[str, Any], key: str) -> dict[str, Any]:
-    value = data.get(key)
+def _require_dict(data: Any, key: str) -> dict[str, Any]:
+    value = data.get(key) if isinstance(data, dict) else None
     if not isinstance(value, dict):
         raise LayeringError(ErrorCode.ARTIFACT_INVALID, f"manifest field {key} must be an object")
     return value
@@ -192,13 +197,33 @@ def _require_str(data: dict[str, Any], key: str) -> str:
 
 def _require_positive_int(data: dict[str, Any], key: str) -> int:
     value = data.get(key)
-    if not isinstance(value, int) or value <= 0:
+    if not _is_plain_int(value) or value <= 0:
         raise LayeringError(ErrorCode.ARTIFACT_INVALID, f"manifest field {key} must be a positive integer")
     return value
 
 
 def _require_non_negative_int(data: dict[str, Any], key: str) -> int:
     value = data.get(key)
-    if not isinstance(value, int) or value < 0:
+    if not _is_plain_int(value) or value < 0:
         raise LayeringError(ErrorCode.ARTIFACT_INVALID, f"manifest field {key} must be a non-negative integer")
     return value
+
+
+def _require_bbox(value: Any) -> tuple[int, int, int, int]:
+    if (
+        not isinstance(value, (list, tuple))
+        or len(value) != 4
+        or not all(_is_plain_int(item) for item in value)
+    ):
+        raise LayeringError(ErrorCode.ARTIFACT_INVALID, "layer bbox must contain four integers")
+    return (value[0], value[1], value[2], value[3])
+
+
+def _require_opacity(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
+        raise LayeringError(ErrorCode.ARTIFACT_INVALID, "manifest field opacity must be a number from 0 to 1")
+    return float(value)
+
+
+def _is_plain_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
