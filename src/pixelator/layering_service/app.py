@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Any
 
 from pixelator.layering.types import JobStatus
-from pixelator.layering_service.backends import LayerBackend, LayerRequest, MockLayerBackend
+from pixelator.layering_service.backends import (
+    LayerBackend,
+    LayerRequest,
+    MockLayerBackend,
+    SelfHostedQwenLayerBackend,
+)
 from pixelator.layering_service.jobs import JobStore
 
 _UPLOAD_CHUNK_SIZE = 1024 * 1024
@@ -36,7 +41,7 @@ def create_app(
         service_work_dir = Path(work_dir)
         service_work_dir.mkdir(parents=True, exist_ok=True)
 
-    store = JobStore(service_work_dir, backend or MockLayerBackend())
+    store = JobStore(service_work_dir, backend or select_layer_backend())
     app = FastAPI(title="Pixelator Layer Service", version="0.1.0")
     app.state.job_store = store
     if temporary_work_dir is not None:
@@ -131,8 +136,24 @@ def main() -> int:
         ) from exc
 
     port = int(os.environ.get("PIXELATOR_LAYER_SERVICE_PORT", "8000"))
-    uvicorn.run(create_app(api_token=token), host="0.0.0.0", port=port)
+    uvicorn.run(
+        create_app(api_token=token, backend=select_layer_backend()),
+        host="0.0.0.0",
+        port=port,
+    )
     return 0
+
+
+def select_layer_backend() -> LayerBackend:
+    backend_name = os.environ.get("PIXELATOR_LAYER_BACKEND", "mock").strip().lower()
+    if backend_name in {"", "mock"}:
+        return MockLayerBackend()
+    if backend_name in {"qwen-self-hosted", "aliyun-self-hosted"}:
+        return SelfHostedQwenLayerBackend()
+
+    raise RuntimeError(
+        "PIXELATOR_LAYER_BACKEND must be one of: mock, qwen-self-hosted, aliyun-self-hosted"
+    )
 
 
 def _parse_layer_request(request_json: str) -> LayerRequest:

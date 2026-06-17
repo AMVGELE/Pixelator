@@ -98,26 +98,31 @@ class SelfHostedQwenLayerBackend:
 
     @staticmethod
     def _extract_layers(output: Any) -> list[Image.Image]:
-        images = output.images
+        images = getattr(output, "images", None)
+        if not images:
+            raise RuntimeError("Qwen pipeline output did not include any images")
+
         first = images[0]
         if isinstance(first, (list, tuple)):
+            if not first:
+                raise RuntimeError("Qwen pipeline output did not include any layer images")
             return [layer.convert("RGBA") for layer in first]
 
         return [layer.convert("RGBA") for layer in images]
 
-    @classmethod
-    def _default_pipeline_factory(cls) -> Any:
+    def _default_pipeline_factory(self) -> Any:
         try:
             import torch
-            from diffusers import DiffusionPipeline
+            from diffusers import QwenImageLayeredPipeline
         except ImportError as exc:
             raise RuntimeError(
-                "SelfHostedQwenLayerBackend requires torch and diffusers in the cloud GPU image. "
-                "Install CUDA PyTorch, Diffusers, Transformers, Accelerate, and Pillow there; "
+                "SelfHostedQwenLayerBackend requires torch and a Diffusers build with "
+                "QwenImageLayeredPipeline in the cloud GPU image. Install CUDA PyTorch, "
+                "the latest or source Diffusers, Transformers, Accelerate, and Pillow there; "
                 "the default Pixelator desktop package does not include these heavyweight dependencies."
             ) from exc
 
-        pipeline = DiffusionPipeline.from_pretrained(cls.model_id, torch_dtype=torch.bfloat16)
+        pipeline = QwenImageLayeredPipeline.from_pretrained(self.model_id, torch_dtype=torch.bfloat16)
         if torch.cuda.is_available():
             pipeline = pipeline.to("cuda")
         return pipeline

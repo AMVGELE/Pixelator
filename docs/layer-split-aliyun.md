@@ -35,10 +35,10 @@ $env:PIXELATOR_LAYER_SERVICE_TOKEN = "替换为强随机token"
 
 ```powershell
 $env:PIXELATOR_LAYER_API_KEY = "替换为强随机token"
-.\.venv\Scripts\pixelator-layer.exe split .\samples\hero.png --endpoint http://127.0.0.1:8000 --output .\out\hero-layers.zip
+.\.venv\Scripts\pixelator-layer.exe split .\samples\hero.png --endpoint http://127.0.0.1:8000 --out .\out
 ```
 
-验证完成后，检查 ZIP 内是否包含 `manifest.json`、`preview/composite.png` 和 `layers/` 下的 PNG 图层。
+验证完成后，输出目录会生成 `hero-layers.zip` 和 `batch-summary.json`。检查 ZIP 内是否包含 `manifest.json`、`preview/composite.png` 和 `layers/` 下的 PNG 图层。
 
 ## 云端环境变量
 
@@ -49,12 +49,15 @@ $env:PIXELATOR_LAYER_API_KEY = "替换为强随机token"
 | `PIXELATOR_LAYER_SERVICE_TOKEN` | 服务端 Bearer token，必须使用强随机值，并通过密钥管理或容器环境变量注入。 |
 | `PIXELATOR_LAYER_SERVICE_PORT` | 服务监听端口，默认可由平台或反向代理映射。 |
 | `PIXELATOR_LAYER_SERVICE_MAX_UPLOAD_MB` | 单张上传图片大小限制，用于控制带宽、磁盘和推理风险。 |
+| `PIXELATOR_LAYER_BACKEND` | 后端选择。缺省或 `mock` 使用 mock；`qwen-self-hosted` 或 `aliyun-self-hosted` 使用自托管 Qwen 后端。 |
 
 客户端使用 `PIXELATOR_LAYER_API_KEY` 发送同一个 token。
 
 ## Qwen GPU 依赖和模型缓存
 
 默认 Pixelator 桌面包不包含 Qwen 推理所需的重依赖。自托管镜像需要单独安装 CUDA PyTorch、最新版 Diffusers、Transformers、Accelerate 和 Pillow，并确保 CUDA、驱动、PyTorch 与 GPU 实例规格匹配。
+
+服务端默认自托管后端会使用 Diffusers 的 `QwenImageLayeredPipeline`。请安装已经包含该类的最新版或源码版 Diffusers；如果当前稳定版尚未发布该类，需要从官方源码或对应模型说明中指定的版本构建。
 
 建议把 Hugging Face 或模型缓存目录挂载到持久化磁盘，避免容器重启后重复下载权重。也可以按企业网络策略提前把 `Qwen/Qwen-Image-Layered` 权重同步到内网镜像或模型缓存盘。
 

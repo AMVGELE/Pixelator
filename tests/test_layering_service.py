@@ -10,7 +10,7 @@ import pytest
 from PIL import Image
 
 from pixelator.layering.archive import validate_layer_zip
-from pixelator.layering_service.backends import LayerRequest, SelfHostedQwenLayerBackend
+from pixelator.layering_service.backends import LayerRequest, MockLayerBackend, SelfHostedQwenLayerBackend
 
 
 def _test_client():
@@ -41,7 +41,11 @@ class FakeQwenOutput:
 
 
 class FakeQwenPipeline:
+    def __init__(self):
+        self.calls = []
+
     def __call__(self, **kwargs):
+        self.calls.append(kwargs)
         image = kwargs["image"].convert("RGBA")
         transparent = Image.new("RGBA", image.size, (0, 0, 0, 0))
         return FakeQwenOutput([image, transparent])
@@ -50,14 +54,120 @@ class FakeQwenPipeline:
 def test_self_hosted_qwen_backend_uses_injected_pipeline(tmp_path: Path):
     source = tmp_path / "hero.png"
     Image.new("RGBA", (4, 4), (255, 0, 0, 255)).save(source)
-    backend = SelfHostedQwenLayerBackend(pipeline_factory=lambda: FakeQwenPipeline())
+    factory_calls = 0
+    pipeline = FakeQwenPipeline()
+
+    def pipeline_factory():
+        nonlocal factory_calls
+        factory_calls += 1
+        return pipeline
+
+    backend = SelfHostedQwenLayerBackend(pipeline_factory=pipeline_factory)
 
     manifest = backend.split(source, tmp_path / "artifact.zip", LayerRequest(target_layers=2))
+    second_manifest = backend.split(source, tmp_path / "artifact-2.zip", LayerRequest(target_layers=2))
 
     assert backend.backend_name == "aliyun-self-hosted"
     assert manifest.model.model_id == "Qwen/Qwen-Image-Layered"
+    assert second_manifest.model.model_id == "Qwen/Qwen-Image-Layered"
     assert len(manifest.layers) == 2
     assert (tmp_path / "artifact.zip").exists()
+    assert factory_calls == 1
+    assert len(pipeline.calls) == 2
+    assert pipeline.calls[0]["layers"] == 2
+    assert pipeline.calls[0]["resolution"] == 640
+    assert pipeline.calls[0]["num_inference_steps"] == 50
+    assert pipeline.calls[0]["true_cfg_scale"] == 4.0
+    assert pipeline.calls[0]["cfg_normalize"] is True
+    assert pipeline.calls[0]["use_en_prompt"] is True
+
+
+def test_self_hosted_qwen_backend_rejects_empty_pipeline_output():
+    output = types.SimpleNamespace(images=[])
+
+    with pytest.raises(RuntimeError, match="Qwen pipeline output"):
+        SelfHostedQwenLayerBackend._extract_layers(output)
+
+
+def test_self_hosted_qwen_default_factory_uses_layered_pipeline(monkeypatch):
+    calls = {}
+
+    class FakeCuda:
+        @staticmethod
+        def is_available():
+            return True
+
+    fake_torch = types.SimpleNamespace(bfloat16="bfloat16", cuda=FakeCuda())
+
+    class FakeQwenImageLayeredPipeline:
+        @classmethod
+        def from_pretrained(cls, model_id, torch_dtype=None):
+            calls["model_id"] = model_id
+            calls["torch_dtype"] = torch_dtype
+            return cls()
+
+        def to(self, device):
+            calls["device"] = device
+            return self
+
+    fake_diffusers = types.SimpleNamespace(QwenImageLayeredPipeline=FakeQwenImageLayeredPipeline)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "diffusers", fake_diffusers)
+
+    backend = SelfHostedQwenLayerBackend()
+
+    assert backend.pipeline is backend.pipeline
+    assert calls == {
+        "model_id": "Qwen/Qwen-Image-Layered",
+        "torch_dtype": "bfloat16",
+        "device": "cuda",
+    }
+
+
+def test_layer_service_selects_backend_from_environment(monkeypatch):
+    import pixelator.layering_service.app as app_module
+
+    monkeypatch.delenv("PIXELATOR_LAYER_BACKEND", raising=False)
+    assert isinstance(app_module.select_layer_backend(), MockLayerBackend)
+
+    monkeypatch.setenv("PIXELATOR_LAYER_BACKEND", "mock")
+    assert isinstance(app_module.select_layer_backend(), MockLayerBackend)
+
+    monkeypatch.setenv("PIXELATOR_LAYER_BACKEND", "qwen-self-hosted")
+    assert isinstance(app_module.select_layer_backend(), SelfHostedQwenLayerBackend)
+
+    monkeypatch.setenv("PIXELATOR_LAYER_BACKEND", "aliyun-self-hosted")
+    assert isinstance(app_module.select_layer_backend(), SelfHostedQwenLayerBackend)
+
+
+def test_layer_service_rejects_unknown_backend(monkeypatch):
+    import pixelator.layering_service.app as app_module
+
+    monkeypatch.setenv("PIXELATOR_LAYER_BACKEND", "surprise")
+
+    with pytest.raises(RuntimeError, match="PIXELATOR_LAYER_BACKEND"):
+        app_module.select_layer_backend()
+
+
+def test_create_app_uses_environment_backend_when_not_injected(monkeypatch, tmp_path: Path):
+    from pixelator.layering_service.app import create_app
+
+    monkeypatch.setenv("PIXELATOR_LAYER_BACKEND", "qwen-self-hosted")
+
+    app = create_app(api_token="secret", work_dir=tmp_path)
+
+    assert isinstance(app.state.job_store.backend, SelfHostedQwenLayerBackend)
+
+
+def test_create_app_prefers_injected_backend_over_environment(monkeypatch, tmp_path: Path):
+    from pixelator.layering_service.app import create_app
+
+    injected_backend = MockLayerBackend()
+    monkeypatch.setenv("PIXELATOR_LAYER_BACKEND", "qwen-self-hosted")
+
+    app = create_app(api_token="secret", backend=injected_backend, work_dir=tmp_path)
+
+    assert app.state.job_store.backend is injected_backend
 
 
 def test_dev_optional_dependencies_include_test_client_runtime():
@@ -150,6 +260,29 @@ def test_layer_service_main_requires_explicit_token(monkeypatch):
 
     with pytest.raises(RuntimeError, match="PIXELATOR_LAYER_SERVICE_TOKEN"):
         app_module.main()
+
+
+def test_layer_service_main_uses_selected_backend(monkeypatch):
+    import pixelator.layering_service.app as app_module
+
+    selected_backend = MockLayerBackend()
+    calls = {}
+
+    def fake_select_layer_backend():
+        calls["selected"] = True
+        return selected_backend
+
+    def fake_run(app, **kwargs):
+        calls["backend"] = app.state.job_store.backend
+        calls["port"] = kwargs["port"]
+
+    monkeypatch.setenv("PIXELATOR_LAYER_SERVICE_TOKEN", "secret")
+    monkeypatch.setenv("PIXELATOR_LAYER_SERVICE_PORT", "8123")
+    monkeypatch.setattr(app_module, "select_layer_backend", fake_select_layer_backend)
+    monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace(run=fake_run))
+
+    assert app_module.main() == 0
+    assert calls == {"selected": True, "backend": selected_backend, "port": 8123}
 
 
 def test_cloud_service_generates_safe_source_name_for_dangerous_filename(tmp_path: Path):
