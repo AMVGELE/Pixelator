@@ -103,3 +103,72 @@ def test_validate_layer_zip_rejects_missing_layer_file(tmp_path: Path):
 
     assert exc_info.value.code == ErrorCode.ARTIFACT_INVALID
     assert "layers/layer_001.png" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "layer_file",
+    [
+        "../escape.png",
+        "/absolute/path.png",
+        "C:/temp/layer.png",
+        "layers\\layer_001.png",
+    ],
+)
+def test_validate_layer_zip_rejects_unsafe_layer_file_path(tmp_path: Path, layer_file: str):
+    zip_path = tmp_path / "unsafe-layer-path.zip"
+    manifest = _manifest_data(layer_file=layer_file)
+
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(manifest))
+        archive.writestr(layer_file, b"fake")
+        archive.writestr("preview/composite.png", b"fake")
+
+    with pytest.raises(LayeringError) as exc_info:
+        validate_layer_zip(zip_path)
+
+    assert exc_info.value.code == ErrorCode.ARTIFACT_INVALID
+    assert "unsafe artifact path" in str(exc_info.value)
+    assert layer_file in str(exc_info.value)
+
+
+def test_validate_layer_zip_rejects_preview_file_without_required_prefix(tmp_path: Path):
+    zip_path = tmp_path / "unsafe-preview-path.zip"
+    preview_file = "composite.png"
+    manifest = _manifest_data(preview_file=preview_file)
+
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(manifest))
+        archive.writestr("layers/layer_001.png", b"fake")
+        archive.writestr(preview_file, b"fake")
+
+    with pytest.raises(LayeringError) as exc_info:
+        validate_layer_zip(zip_path)
+
+    assert exc_info.value.code == ErrorCode.ARTIFACT_INVALID
+    assert "unsafe artifact path" in str(exc_info.value)
+    assert preview_file in str(exc_info.value)
+
+
+def _manifest_data(
+    layer_file: str = "layers/layer_001.png",
+    preview_file: str = "preview/composite.png",
+) -> dict:
+    return {
+        "schema_version": 1,
+        "source": {"file_name": "hero.png", "width": 8, "height": 6, "sha256": "abc"},
+        "model": {"provider": "qwen-image-layered", "backend": "mock", "model_id": "mock"},
+        "layers": [
+            {
+                "id": "layer_001",
+                "name": "layer_001",
+                "file": layer_file,
+                "order": 0,
+                "bbox": [0, 0, 8, 6],
+                "width": 8,
+                "height": 6,
+                "opacity": 1.0,
+                "blend_mode": "normal",
+            }
+        ],
+        "preview": {"file": preview_file},
+    }

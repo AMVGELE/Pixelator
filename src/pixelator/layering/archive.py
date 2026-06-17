@@ -137,8 +137,10 @@ def validate_layer_zip(path: str | Path) -> LayerManifest:
                 raise LayeringError(ErrorCode.ARTIFACT_INVALID, "layer ZIP manifest is invalid JSON") from exc
 
             manifest = LayerManifest.from_dict(manifest_data)
+            _require_safe_artifact_path(manifest.preview.file, "preview/")
             _require_zip_member(names, manifest.preview.file)
             for layer in manifest.layers:
+                _require_safe_artifact_path(layer.file, "layers/")
                 _require_zip_member(names, layer.file)
 
             return manifest
@@ -157,3 +159,20 @@ def _png_bytes(image: Image.Image) -> bytes:
 def _require_zip_member(names: set[str], member: str) -> None:
     if member not in names:
         raise LayeringError(ErrorCode.ARTIFACT_INVALID, f"layer ZIP is missing required file: {member}")
+
+
+def _require_safe_artifact_path(member: str, required_prefix: str) -> None:
+    parts = member.split("/")
+    if (
+        not member.startswith(required_prefix)
+        or member.startswith("/")
+        or any(_has_windows_drive(part) for part in parts)
+        or "\\" in member
+        or ".." in parts
+        or "" in parts
+    ):
+        raise LayeringError(ErrorCode.ARTIFACT_INVALID, f"unsafe artifact path in layer ZIP: {member}")
+
+
+def _has_windows_drive(member: str) -> bool:
+    return len(member) >= 2 and member[0].isalpha() and member[1] == ":"
