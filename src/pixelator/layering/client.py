@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from pixelator.layering.archive import validate_layer_zip
 from pixelator.layering.types import ErrorCode, JobStatus, LayerManifest, LayeringError
@@ -101,12 +101,14 @@ class LayerSplitClient:
 
         resolved_url = self._resolve_url(artifact_url)
         headers = {"Accept": "application/zip"}
-        if self._should_authorize_artifact_url(artifact_url):
+        authorize_artifact = self._should_authorize_artifact_url(artifact_url)
+        if authorize_artifact:
             request = self._request("GET", resolved_url, headers=headers)
         else:
             request = Request(resolved_url, headers=headers, method="GET")
         try:
-            with urlopen(request, timeout=self.timeout) as response:
+            opener = build_opener(_ArtifactRedirectHandler(urlparse(self.endpoint), authorize_artifact))
+            with opener.open(request, timeout=self.timeout) as response:
                 temporary.write_bytes(response.read())
             validate_layer_zip(temporary)
             temporary.replace(destination)
@@ -209,6 +211,18 @@ def _multipart_body(
 
     chunks.append(f"--{boundary}--\r\n".encode("ascii"))
     return b"".join(chunks), f"multipart/form-data; boundary={boundary}"
+
+
+class _ArtifactRedirectHandler(HTTPRedirectHandler):
+    def __init__(self, endpoint: Any, request_authorized: bool) -> None:
+        self.endpoint_origin = _origin(endpoint)
+        self.request_authorized = request_authorized
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        redirect_url = urljoin(req.full_url, newurl)
+        if self.request_authorized and _origin(urlparse(redirect_url)) != self.endpoint_origin:
+            raise LayeringError(ErrorCode.JOB_FAILED, "cross-origin artifact redirect rejected")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def _http_error(error: HTTPError) -> LayeringError:

@@ -339,6 +339,69 @@ def test_cross_origin_artifact_download_omits_authorization(tmp_path: Path):
     assert CrossOriginArtifactHandler.observed_authorization is None
 
 
+def test_authorized_artifact_download_rejects_cross_origin_redirect(tmp_path: Path):
+    class RedirectTargetHandler(BaseHTTPRequestHandler):
+        artifact_path: Path
+        request_count = 0
+        observed_authorization: str | None = None
+
+        def do_GET(self):
+            self.__class__.request_count += 1
+            self.__class__.observed_authorization = self.headers.get("Authorization")
+            data = self.__class__.artifact_path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, format, *args):
+            return
+
+    class RedirectingArtifactHandler(BaseHTTPRequestHandler):
+        redirect_url: str
+
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", self.__class__.redirect_url)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, format, *args):
+            return
+
+    source = tmp_path / "hero.png"
+    Image.new("RGBA", (2, 2), (0, 0, 0, 255)).save(source)
+    artifact = tmp_path / "artifact.zip"
+    write_layer_zip(source, Image.open(source), [Image.open(source)], artifact, backend="mock", model_id="mock")
+    RedirectTargetHandler.artifact_path = artifact
+    RedirectTargetHandler.request_count = 0
+    RedirectTargetHandler.observed_authorization = None
+
+    target_server = ThreadingHTTPServer(("127.0.0.1", 0), RedirectTargetHandler)
+    target_thread = threading.Thread(target=target_server.serve_forever, daemon=True)
+    target_thread.start()
+    RedirectingArtifactHandler.redirect_url = f"http://127.0.0.1:{target_server.server_port}/artifact.zip"
+
+    redirect_server = ThreadingHTTPServer(("127.0.0.1", 0), RedirectingArtifactHandler)
+    redirect_thread = threading.Thread(target=redirect_server.serve_forever, daemon=True)
+    redirect_thread.start()
+
+    try:
+        client = LayerSplitClient(endpoint=f"http://127.0.0.1:{redirect_server.server_port}", api_key="secret")
+        with pytest.raises(LayeringError) as exc_info:
+            client.download_artifact("/redirect-artifact", tmp_path / "downloaded.zip")
+    finally:
+        redirect_server.shutdown()
+        redirect_thread.join(timeout=2)
+        target_server.shutdown()
+        target_thread.join(timeout=2)
+
+    assert exc_info.value.code == ErrorCode.JOB_FAILED
+    assert RedirectTargetHandler.request_count == 0
+    assert RedirectTargetHandler.observed_authorization is None
+
+
 def test_invalid_downloaded_artifact_preserves_previous_valid_output(tmp_path: Path):
     class InvalidArtifactHandler(BaseHTTPRequestHandler):
         def do_GET(self):
