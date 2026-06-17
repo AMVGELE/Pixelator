@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pixelator"
-version = "1.1.4"
-description = "CLI video/GIF-to-light-pixel-art workflow tool."
+version = "1.1.5"
+description = "CLI and desktop media-to-light-pixel-art workflow tool."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

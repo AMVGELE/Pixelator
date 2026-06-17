@@ -1,7 +1,9 @@
 from PIL import Image
+import pytest
 
 from pixelator.config import CropConfig, EffectsConfig, OutputConfig, PaletteConfig, PixelConfig, RenderConfig, TrimConfig
-from pixelator.pipeline import prepare_source_frames, process_frames, render_video
+from pixelator.errors import MediaError, OutputError
+from pixelator.pipeline import prepare_source_frames, process_frames, render_image, render_media, render_video
 from pixelator.video import VideoMetadata
 
 
@@ -212,3 +214,139 @@ def test_render_gif_input_to_video_skips_audio_mux(monkeypatch, tmp_path):
 
     assert output.read_bytes() == b"video"
     assert "write_video" in calls
+
+
+def test_render_image_writes_pixelated_png(tmp_path):
+    source = tmp_path / "texture.png"
+    output = tmp_path / "texture-pixelated.png"
+    image = Image.new("RGB", (5, 3), (255, 0, 0))
+    image.putpixel((4, 2), (0, 0, 255))
+    image.save(source)
+
+    result = render_image(
+        source,
+        output,
+        RenderConfig(
+            mode="fast",
+            pixel=PixelConfig(scale=1),
+            effects=EffectsConfig(crt="off", vhs="off"),
+            output=OutputConfig(overwrite=True),
+        ),
+    )
+
+    assert result == output
+    with Image.open(output) as rendered:
+        assert rendered.format == "PNG"
+        assert rendered.size == (5, 3)
+
+
+def test_render_image_preserves_alpha_for_png_output(tmp_path):
+    source = tmp_path / "cutout.png"
+    output = tmp_path / "cutout-pixelated.png"
+    image = Image.new("RGBA", (4, 3), (255, 0, 0, 0))
+    for x in range(4):
+        image.putpixel((x, 2), (0, 255, 0, 255))
+    image.save(source)
+
+    render_image(
+        source,
+        output,
+        RenderConfig(
+            mode="fast",
+            pixel=PixelConfig(scale=1),
+            palette=PaletteConfig(strategy="custom", custom_colors=["#000000", "#ffffff"]),
+            effects=EffectsConfig(crt="off", vhs="off"),
+            output=OutputConfig(overwrite=True),
+        ),
+    )
+
+    with Image.open(output) as rendered:
+        rgba = rendered.convert("RGBA")
+        assert rgba.getpixel((0, 0))[3] == 0
+        assert rgba.getpixel((3, 1))[3] == 0
+        assert rgba.getpixel((0, 2))[3] == 255
+        assert rgba.getpixel((3, 2))[3] == 255
+
+
+def test_render_image_preserves_cropped_alpha_mask(tmp_path):
+    source = tmp_path / "alpha-crop.png"
+    output = tmp_path / "alpha-crop-pixelated.png"
+    image = Image.new("RGBA", (4, 4), (32, 64, 96, 0))
+    crop_alphas = [0, 64, 128, 255]
+    for index, alpha in enumerate(crop_alphas):
+        x = 1 + index % 2
+        y = 1 + index // 2
+        image.putpixel((x, y), (200, 180, 160, alpha))
+    image.save(source)
+
+    render_image(
+        source,
+        output,
+        RenderConfig(
+            mode="fast",
+            pixel=PixelConfig(scale=1),
+            crop=CropConfig(x=1, y=1, width=2, height=2),
+            effects=EffectsConfig(crt="off", vhs="off"),
+            output=OutputConfig(overwrite=True),
+        ),
+    )
+
+    with Image.open(output) as rendered:
+        alpha = list(rendered.convert("RGBA").getchannel("A").getdata())
+        assert rendered.size == (2, 2)
+        assert alpha == crop_alphas
+
+
+def test_render_image_preserves_odd_crop_dimensions(tmp_path):
+    source = tmp_path / "texture.png"
+    output = tmp_path / "cropped.png"
+    Image.new("RGB", (7, 5), (255, 0, 0)).save(source)
+
+    render_image(
+        source,
+        output,
+        RenderConfig(
+            mode="fast",
+            pixel=PixelConfig(scale=1),
+            crop=CropConfig(x=1, y=1, width=3, height=3),
+            effects=EffectsConfig(crt="off", vhs="off"),
+            output=OutputConfig(overwrite=True),
+        ),
+    )
+
+    with Image.open(output) as rendered:
+        assert rendered.size == (3, 3)
+
+
+def test_render_image_rejects_video_output_extension(tmp_path):
+    source = tmp_path / "texture.png"
+    Image.new("RGB", (4, 4), (255, 0, 0)).save(source)
+
+    with pytest.raises(OutputError, match="Unsupported image output format"):
+        render_image(
+            source,
+            tmp_path / "texture.mp4",
+            RenderConfig(output=OutputConfig(overwrite=True)),
+        )
+
+
+def test_render_media_dispatches_images(monkeypatch, tmp_path):
+    source = tmp_path / "texture.png"
+    output = tmp_path / "texture-pixelated.png"
+    calls = {}
+
+    def fake_render_image(input_file, output_file, config):
+        calls["image"] = (input_file, output_file, config)
+        return output
+
+    monkeypatch.setattr("pixelator.pipeline.render_image", fake_render_image)
+
+    result = render_media(source, output, RenderConfig())
+
+    assert result == output
+    assert calls["image"][0] == source
+
+
+def test_render_media_rejects_unknown_input_extension(tmp_path):
+    with pytest.raises(MediaError, match="Unsupported input media type"):
+        render_media(tmp_path / "source.txt", tmp_path / "out.png", RenderConfig())

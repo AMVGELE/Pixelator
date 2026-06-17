@@ -38,6 +38,7 @@ def preview_to_source_crop(
     preview_rect: tuple[int, int, int, int],
     source_size: tuple[int, int],
     widget_size: tuple[int, int],
+    encoder_safe: bool = True,
 ) -> CropConfig:
     fit_x, fit_y, fit_width, fit_height = fit_rect(source_size, widget_size)
     x, y, width, height = preview_rect
@@ -54,8 +55,8 @@ def preview_to_source_crop(
     clamped_y = max(0, source_y)
     clamped_right = min(source_size[0], source_right)
     clamped_bottom = min(source_size[1], source_bottom)
-    source_width = _even_encoder_dimension(max(1, clamped_right - clamped_x), source_size[0] - clamped_x)
-    source_height = _even_encoder_dimension(max(1, clamped_bottom - clamped_y), source_size[1] - clamped_y)
+    source_width = _output_dimension(max(1, clamped_right - clamped_x), source_size[0] - clamped_x, encoder_safe)
+    source_height = _output_dimension(max(1, clamped_bottom - clamped_y), source_size[1] - clamped_y, encoder_safe)
     return CropConfig(
         x=clamped_x,
         y=clamped_y,
@@ -74,6 +75,7 @@ class PreviewWidget(QWidget):
         self._pixmap: QPixmap | None = None
         self._source_size: tuple[int, int] | None = None
         self._crop: CropConfig | None = None
+        self._encoder_safe_crop = True
         self._drag_mode: str | None = None
         self._drag_start: QPoint | None = None
         self._drag_rect: tuple[int, int, int, int] | None = None
@@ -92,9 +94,16 @@ class PreviewWidget(QWidget):
         width, height = self._source_size
         if crop is None:
             crop = CropConfig(x=0, y=0, width=width, height=height)
-        self._crop = clamp_crop(crop, self._source_size)
+        self._crop = clamp_crop(crop, self._source_size, encoder_safe=self._encoder_safe_crop)
         self.cropChanged.emit(self._crop)
         self.update()
+
+    def set_encoder_safe_crop(self, enabled: bool) -> None:
+        if self._encoder_safe_crop == enabled:
+            return
+        self._encoder_safe_crop = enabled
+        if self._source_size is not None and self._crop is not None:
+            self.set_crop(self._crop)
 
     def crop(self) -> CropConfig | None:
         return self._crop
@@ -136,7 +145,12 @@ class PreviewWidget(QWidget):
             return
         current = event.position().toPoint()
         next_rect = self._dragged_rect(current)
-        self._crop = preview_to_source_crop(next_rect, self._source_size, (self.width(), self.height()))
+        self._crop = preview_to_source_crop(
+            next_rect,
+            self._source_size,
+            (self.width(), self.height()),
+            encoder_safe=self._encoder_safe_crop,
+        )
         self.cropChanged.emit(self._crop)
         self.update()
 
@@ -207,15 +221,21 @@ def _pil_to_qimage(image: Image.Image) -> QImage:
     return qimage.copy()
 
 
-def clamp_crop(crop: CropConfig, source_size: tuple[int, int]) -> CropConfig:
+def clamp_crop(crop: CropConfig, source_size: tuple[int, int], encoder_safe: bool = True) -> CropConfig:
     width, height = source_size
     x = min(max(0, crop.x), width - 1)
     y = min(max(0, crop.y), height - 1)
     right = min(width, x + max(1, crop.width))
     bottom = min(height, y + max(1, crop.height))
-    crop_width = _even_encoder_dimension(max(1, right - x), width - x)
-    crop_height = _even_encoder_dimension(max(1, bottom - y), height - y)
+    crop_width = _output_dimension(max(1, right - x), width - x, encoder_safe)
+    crop_height = _output_dimension(max(1, bottom - y), height - y, encoder_safe)
     return CropConfig(x=x, y=y, width=crop_width, height=crop_height)
+
+
+def _output_dimension(value: int, max_value: int, encoder_safe: bool) -> int:
+    if encoder_safe:
+        return _even_encoder_dimension(value, max_value)
+    return max(1, min(value, max_value))
 
 
 def _even_encoder_dimension(value: int, max_value: int) -> int:

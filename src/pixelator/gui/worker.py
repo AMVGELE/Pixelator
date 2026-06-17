@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot
 
 from pixelator.gui.models import RenderSettings, VideoJob
-from pixelator.pipeline import render_video
+from pixelator.pipeline import render_media
 
 
 class RenderWorker(QObject):
@@ -26,7 +26,7 @@ class RenderWorker(QObject):
         try:
             self.progressChanged.emit(self.job.id, 0)
             self.logMessage.emit(f"Rendering {self.job.source_path.name}")
-            output = render_video(self.job.source_path, self.output_path, self.settings.to_config())
+            output = render_media(self.job.source_path, self.output_path, self.settings.to_config())
             self.progressChanged.emit(self.job.id, 100)
             self.jobCompleted.emit(self.job.id, output)
         except Exception as exc:  # noqa: BLE001 - GUI must surface worker failures instead of crashing.

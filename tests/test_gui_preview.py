@@ -36,3 +36,9 @@ def test_clamp_crop_uses_even_dimensions_for_video_output():
     result = clamp_crop(CropConfig(x=10, y=4, width=31, height=19), (100, 80))
 
     assert result == CropConfig(x=10, y=4, width=30, height=18)
+
+
+def test_clamp_crop_can_preserve_odd_dimensions_for_image_output():
+    result = clamp_crop(CropConfig(x=10, y=4, width=31, height=19), (100, 80), encoder_safe=False)
+
+    assert result == CropConfig(x=10, y=4, width=31, height=19)

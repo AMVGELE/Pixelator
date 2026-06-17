@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 import pytest
 from PIL import Image
 
+from pixelator.gui.models import PaletteSnapshot
 from pixelator.gui.palette_panel import PalettePanel
 
 
@@ -108,6 +109,62 @@ def test_palette_panel_imports_lospec_text(tmp_path, qapp):
 
     assert panel.colors() == ["#1a1c2c", "#ffcc00"]
     assert panel.source_colors() == ["#1a1c2c", "#ffcc00"]
+
+
+def test_palette_panel_snapshot_round_trip(qapp):
+    panel = PalettePanel()
+    panel.set_source_and_render_colors(["#ff0000", "#0000ff"])
+    panel.set_colors(["#1a1c2c", "#f4f4f4"])
+    panel.auto_match_check.setChecked(False)
+    panel.sort_combo.setCurrentText("Brightness")
+
+    snapshot = panel.snapshot()
+    target = PalettePanel()
+    target.load_snapshot(snapshot)
+
+    assert target.source_colors() == ["#ff0000", "#0000ff"]
+    assert target.colors() == ["#1a1c2c", "#f4f4f4"]
+    assert target.auto_match_check.isChecked() is False
+    assert target.match_sort_mode() == "brightness"
+
+
+def test_palette_panel_load_snapshot_can_emit_changed(qapp):
+    panel = PalettePanel()
+    emissions = []
+    panel.paletteChanged.connect(lambda: emissions.append("changed"))
+
+    panel.load_snapshot(PaletteSnapshot(render_colors=["#000000", "#ffffff"]), emit_changed=True)
+
+    assert emissions == ["changed"]
+
+
+def test_palette_panel_extracts_from_image_file_with_selected_method(tmp_path, qapp):
+    image = Image.new("RGB", (6, 1))
+    image.putdata(
+        [(16, 16, 16)] * 2
+        + [(128, 128, 128)] * 2
+        + [(240, 240, 240)] * 2
+    )
+    path = tmp_path / "source.png"
+    image.save(path)
+    panel = PalettePanel()
+    panel.extract_count_spin.setValue(3)
+    panel.extract_method_combo.setCurrentText("Shadows / Midtones / Highlights")
+
+    panel.extract_from_image_file(path)
+
+    assert panel.source_colors() == ["#101010", "#808080", "#f0f0f0"]
+
+
+def test_palette_panel_palette_mode_signal(qapp):
+    panel = PalettePanel()
+    modes = []
+    panel.paletteModeChanged.connect(modes.append)
+
+    panel.palette_mode_combo.setCurrentText("Per Item Palette")
+
+    assert panel.palette_mode() == "item"
+    assert modes == ["item"]
 
 
 def test_palette_panel_saves_loads_and_deletes_presets(tmp_path, qapp):

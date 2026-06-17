@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pixelator.config import ConfigError, CropConfig, RenderConfig, TrimConfig, load_config, merge_cli_overrides
 from pixelator.errors import PixelatorError
-from pixelator.pipeline import render_video
+from pixelator.pipeline import render_media
 
 
 def _parse_crop(value: str) -> CropConfig:
@@ -36,10 +36,10 @@ def _parse_trim(value: str) -> TrimConfig:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pixelator",
-        description="Convert videos and GIFs into a light pixel-art style.",
+        description="Convert videos, GIFs, and texture images into a light pixel-art style.",
     )
-    parser.add_argument("input", type=Path, help="Input video or GIF path.")
-    parser.add_argument("--out", type=Path, required=True, help="Output video or GIF path.")
+    parser.add_argument("input", type=Path, help="Input video, GIF, or image path.")
+    parser.add_argument("--out", type=Path, required=True, help="Output video, GIF, or image path.")
     parser.add_argument("--config", type=Path, help="YAML config path.")
     parser.add_argument("--mode", choices=["fast", "stable"], help="Render mode.")
     parser.add_argument("--pixel-scale", type=int, help="Pixel scale factor.")
@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
             "output.overwrite": True if args.overwrite else None,
         }
         config = merge_cli_overrides(config, overrides)
-        output = render_video(args.input, args.out, config)
+        output = render_media(args.input, args.out, config)
     except SystemExit as exc:
         return int(exc.code)
     except (PixelatorError, ConfigError) as exc:

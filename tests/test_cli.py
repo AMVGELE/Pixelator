@@ -17,14 +17,14 @@ def test_cli_dispatches_render(monkeypatch, tmp_path: Path):
     input_path.write_bytes(b"fake")
     calls = {}
 
-    def fake_render_video(input_file, output_file, config):
+    def fake_render_media(input_file, output_file, config):
         calls["input"] = input_file
         calls["output"] = output_file
         calls["mode"] = config.mode
         output_path.write_bytes(b"rendered")
         return output_path
 
-    monkeypatch.setattr(cli, "render_video", fake_render_video)
+    monkeypatch.setattr(cli, "render_media", fake_render_media)
 
     exit_code = cli.main([str(input_path), "--mode", "fast", "--out", str(output_path), "--overwrite"])
 
@@ -40,12 +40,12 @@ def test_cli_dispatches_crop_and_trim(monkeypatch, tmp_path: Path):
     input_path.write_bytes(b"fake")
     calls = {}
 
-    def fake_render_video(input_file, output_file, config):
+    def fake_render_media(input_file, output_file, config):
         calls["config"] = config
         output_path.write_bytes(b"rendered")
         return output_path
 
-    monkeypatch.setattr(cli, "render_video", fake_render_video)
+    monkeypatch.setattr(cli, "render_media", fake_render_media)
 
     exit_code = cli.main(
         [

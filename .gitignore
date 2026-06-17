@@ -12,3 +12,6 @@ outputs/
 tmp/
 *.mp4.tmp
 *.mov.tmp
+docs/PROGRESS.md
+docs/superpowers/
+SuperPower.md
