@@ -128,6 +128,19 @@ automatic `Colors` count and output controls; Palette provides a Source -> Rende
 comparison board for custom colors. Source is the latest extracted or imported
 reference palette; Render is the palette that will actually be used for output.
 
+The `AI Assets` tab can generate new 2D game assets through DashScope Qwen-Image
+and save them as PNG files under `outputs/ai-assets`. Set `DASHSCOPE_API_KEY` in
+the environment, keep it in `.env.local`, or paste it into `AI Assets` ->
+`Provider Settings` -> `Qwen API key` for the current session. The model defaults
+to `qwen-image-2.0`, and the endpoint defaults to the Beijing DashScope image
+generation endpoint. When Background is `Transparent`, the GUI uses
+`ALIYUN_VIAPI_CREDENTIALS` to run Aliyun VIAPI background removal before saving
+the PNG. The Aliyun account must have the visual segmentation `SegmentCommonImage`
+API enabled, otherwise Aliyun returns a provider error before Pixelator can save
+the transparent result. Generated PNG assets can be added back into the normal
+Pixelator queue with `Add To Queue`, then cropped, palette matched, pixelated,
+and exported like any other image input.
+
 Palette Studio tools in the Palette tab can extract colors from the current
 preview frame or from an image file, save and load local presets, import local
 Lospec-style `.hex` or `.txt` files, and sort colors by brightness, hue, or

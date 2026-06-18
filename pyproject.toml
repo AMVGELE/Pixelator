@@ -18,13 +18,21 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "httpx2>=2.0",
   "pyinstaller>=6.0",
   "pytest>=8.0",
+]
+layer-cloud = [
+  "fastapi>=0.115",
+  "python-multipart>=0.0.9",
+  "uvicorn>=0.30",
 ]
 
 [project.scripts]
 pixelator = "pixelator.cli:main"
 pixelator-gui = "pixelator.gui.app:main"
+pixelator-layer = "pixelator.layering.cli:main"
+pixelator-layer-service = "pixelator.layering_service.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
