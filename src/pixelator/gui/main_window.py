@@ -22,11 +22,15 @@ from PySide6.QtWidgets import (
 )
 from PIL import Image
 
+from pixelator.ai.asset_store import AssetStore
 from pixelator.config import CropConfig, TrimConfig
 from pixelator.errors import PixelatorError
+from pixelator.gui.ai_panel import AiAssetsPanel
+from pixelator.gui.ai_worker import AiGenerationWorker
 from pixelator.gui.models import JobQueue, JobStatus, PaletteSnapshot, RenderSettings, VideoJob
 from pixelator.gui.palette_panel import PalettePanel
 from pixelator.gui.preview import PreviewWidget, clamp_crop
+from pixelator.gui.qwen_lab_panel import QwenLabPanel
 from pixelator.gui.queue_panel import QueuePanel
 from pixelator.gui.settings_panel import SettingsPanel
 from pixelator.gui.worker import RenderWorker
@@ -46,9 +50,14 @@ class MainWindow(QMainWindow):
         self._current_preview_frame: Image.Image | None = None
         self._active_thread: QThread | None = None
         self._active_worker: RenderWorker | None = None
+        self._ai_thread: QThread | None = None
+        self._ai_worker: AiGenerationWorker | None = None
+        self._active_ai_panel = None
         self.queue_panel = QueuePanel()
         self.settings_panel = SettingsPanel()
         self.palette_panel = PalettePanel()
+        self.ai_panel = AiAssetsPanel()
+        self.qwen_lab_panel = QwenLabPanel()
         self.preview_widget = PreviewWidget()
         self._global_render_settings = self.settings_panel.settings()
         self._shared_palette_snapshot = self.palette_panel.snapshot()
@@ -84,6 +93,7 @@ class MainWindow(QMainWindow):
 
         self._build_layout()
         self._connect_signals()
+        self._load_ai_assets()
         self._apply_style()
         self.setWindowTitle("Pixelator Desktop")
         self.setMinimumSize(1280, 720)
@@ -127,6 +137,8 @@ class MainWindow(QMainWindow):
         self.right_tabs = QTabWidget()
         self.right_tabs.addTab(self.settings_panel, "Render")
         self.right_tabs.addTab(self.palette_panel, "Palette")
+        self.right_tabs.addTab(self.ai_panel, "AI Assets")
+        self.right_tabs.addTab(self.qwen_lab_panel, "Qwen Lab")
         top_splitter.addWidget(self.right_tabs)
         top_splitter.setSizes([260, 680, 320])
 
@@ -206,6 +218,9 @@ class MainWindow(QMainWindow):
         self.palette_panel.paletteChanged.connect(self._on_palette_changed)
         self.palette_panel.paletteModeChanged.connect(self._on_palette_mode_changed)
         self.palette_panel.extractCurrentFrameRequested.connect(self._extract_palette_from_current_frame)
+        self.ai_panel.generateRequested.connect(self._start_ai_generation)
+        self.ai_panel.addAssetToQueueRequested.connect(self._add_ai_asset_to_queue)
+        self.qwen_lab_panel.generateRequested.connect(self._start_qwen_lab_generation)
         self.preview_widget.cropChanged.connect(self._on_crop_changed)
         self.trim_start_spin.valueChanged.connect(lambda value: self._on_trim_changed())
         self.trim_end_spin.valueChanged.connect(lambda value: self._on_trim_changed())
@@ -524,6 +539,88 @@ class MainWindow(QMainWindow):
         self._active_thread = None
         self._active_worker = None
         self._run_next_job()
+
+    def _start_ai_generation(self, request, config) -> None:
+        self._start_ai_generation_worker(
+            request=request,
+            config=config,
+            panel=self.ai_panel,
+            prompt=None,
+            completed_slot=self._on_ai_generation_completed,
+            failed_prefix="AI generation failed",
+        )
+
+    def _start_qwen_lab_generation(self, request, prompt, config) -> None:
+        self._start_ai_generation_worker(
+            request=request,
+            config=config,
+            panel=self.qwen_lab_panel,
+            prompt=prompt,
+            completed_slot=self._on_qwen_lab_generation_completed,
+            failed_prefix="Qwen Lab generation failed",
+        )
+
+    def _start_ai_generation_worker(self, request, config, panel, prompt, completed_slot, failed_prefix: str) -> None:
+        if self._ai_thread is not None:
+            self.append_log("AI generation already running.")
+            return
+        panel.set_generating(True)
+        thread = QThread(self)
+        worker = AiGenerationWorker(request, config, self._ai_output_dir(), prompt=prompt)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.logMessage.connect(self.append_log)
+        worker.generationCompleted.connect(completed_slot)
+        worker.generationFailed.connect(lambda error: self._on_ai_generation_failed(error, panel, failed_prefix))
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self._on_ai_thread_finished)
+        self._ai_thread = thread
+        self._ai_worker = worker
+        self._active_ai_panel = panel
+        thread.start()
+
+    def _on_ai_generation_completed(self, records) -> None:
+        self.ai_panel.add_asset_records(records)
+        self.ai_panel.set_status_message(f"Saved {len(records)} AI asset(s)")
+        self.append_log(f"Generated {len(records)} AI asset(s) in {self._ai_output_dir()}")
+
+    def _on_qwen_lab_generation_completed(self, records) -> None:
+        self.qwen_lab_panel.add_asset_records(records)
+        self.qwen_lab_panel.set_status_message(f"Saved and queued {len(records)} AI asset(s)")
+        paths = [record.image_path for record in records]
+        if paths:
+            self.add_media_paths(paths)
+        self.append_log(f"Qwen Lab generated and queued {len(records)} AI asset(s) in {self._ai_output_dir()}")
+
+    def _on_ai_generation_failed(self, error: str, panel=None, prefix: str = "AI generation failed") -> None:
+        target_panel = panel or self.ai_panel
+        target_panel.set_status_message(error)
+        self.append_log(f"{prefix}: {error}")
+
+    def _on_ai_thread_finished(self) -> None:
+        self._ai_thread = None
+        self._ai_worker = None
+        if self._active_ai_panel is not None:
+            self._active_ai_panel.set_generating(False)
+        self._active_ai_panel = None
+
+    def _add_ai_asset_to_queue(self, path: str) -> None:
+        asset_path = Path(path)
+        if not asset_path.exists():
+            self.append_log(f"AI asset not found: {asset_path}")
+            return
+        self.add_media_paths([asset_path])
+        self.append_log(f"Added AI asset to queue: {asset_path.name}")
+
+    def _load_ai_assets(self) -> None:
+        records = AssetStore(self._ai_output_dir()).load_records()
+        self.ai_panel.load_asset_records(records)
+        self.qwen_lab_panel.load_asset_records(records)
+
+    def _ai_output_dir(self) -> Path:
+        return self.settings_panel.output_folder() / "ai-assets"
 
     def _refresh_queue(self) -> None:
         selected = self.queue_panel.selected_job_id()

@@ -392,9 +392,11 @@ def test_image_crop_controls_preserve_odd_dimensions(tmp_path: Path, qapp):
 def test_right_side_splits_render_and_palette_tabs(qapp):
     window = MainWindow()
 
-    assert window.right_tabs.count() == 2
+    assert window.right_tabs.count() == 4
     assert window.right_tabs.tabText(0) == "Render"
     assert window.right_tabs.tabText(1) == "Palette"
+    assert window.right_tabs.tabText(2) == "AI Assets"
+    assert window.right_tabs.tabText(3) == "Qwen Lab"
     window.close()
 
 
