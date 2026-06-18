@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 
 from pixelator.ai.background_removal import remove_image_background
 from pixelator.ai.constants import (
+    ASSET_SIZES,
     DEFAULT_DASHSCOPE_IMAGE_ENDPOINT,
     DEFAULT_DASHSCOPE_TASK_ENDPOINT,
     DEFAULT_IMAGE_MODEL,
@@ -93,7 +94,19 @@ class DashScopeClient:
         request.validate()
         api_key = self._api_key()
         model = self._model()
-        payload = self._request_payload(model, request, prompt)
+        downloads: list[DownloadedImage] = []
+        for _index in range(request.count):
+            downloads.extend(self._generate_once(api_key, model, request, prompt))
+        return downloads[: request.count]
+
+    def _generate_once(
+        self,
+        api_key: str,
+        model: str,
+        request: AiGenerationRequest,
+        prompt: PromptResult,
+    ) -> list[DownloadedImage]:
+        payload = self._request_payload(model, request, prompt, count=1)
         response = self.transport.request_json(
             self._image_endpoint(),
             payload,
@@ -116,7 +129,7 @@ class DashScopeClient:
             raise DashScopeError("DashScope image generation succeeded but returned no image URL.")
         if request.background == "transparent":
             images = [self._remove_image_background(image) for image in images]
-        return [self._download_image(image) for image in images[: request.count]]
+        return [self._download_image(image) for image in images[:1]]
 
     def _remove_image_background(self, image: dict[str, str | None]) -> dict[str, str | None]:
         url = image.get("url") or ""
@@ -167,6 +180,7 @@ class DashScopeClient:
         model: str,
         request: AiGenerationRequest,
         prompt: PromptResult,
+        count: int,
     ) -> dict[str, Any]:
         return {
             "model": model,
@@ -183,7 +197,7 @@ class DashScopeClient:
                 "prompt_extend": False,
                 "watermark": False,
                 "size": _dashscope_size(request.size),
-                "n": request.count,
+                "n": count,
             },
         }
 
@@ -229,7 +243,9 @@ class DashScopeClient:
 
 def _dashscope_size(size: str) -> str:
     width, height = [int(part) for part in size.split("x", 1)]
-    return f"{max(width, 512)}*{max(height, 512)}"
+    if size in ASSET_SIZES:
+        return f"{max(width, 512)}*{max(height, 512)}"
+    return f"{width}*{height}"
 
 
 def _parse_json_response(body: bytes) -> Any:

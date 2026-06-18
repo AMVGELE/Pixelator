@@ -53,7 +53,7 @@ def test_ai_panel_preserves_status_when_generation_stops(qapp):
 def test_main_window_has_ai_assets_tab(qapp):
     window = MainWindow()
 
-    assert window.right_tabs.count() == 3
+    assert window.right_tabs.count() == 4
     assert window.right_tabs.tabText(2) == "AI Assets"
     window.close()
 
