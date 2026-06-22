@@ -9,6 +9,7 @@ description = "CLI and desktop media-to-light-pixel-art workflow tool."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "alibabacloud_imageenhan20190930>=3.0.0",
   "imageio-ffmpeg>=0.4.9",
   "numpy>=1.26",
   "Pillow>=10.0",

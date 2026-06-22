@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QSize, QSettings, Qt, Signal
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
@@ -32,7 +34,7 @@ from pixelator.ai.constants import (
     GAME_GENRES,
     VIEW_LABELS,
 )
-from pixelator.ai.env import config_value
+from pixelator.ai.env import config_value, save_local_env_value
 from pixelator.ai.prompt_builder import build_prompt
 from pixelator.ai.types import AiAssetRecord, AiGenerationRequest, DashScopeConfig, PromptResult
 
@@ -80,6 +82,7 @@ class QwenLabPanel(QWidget):
         self.api_key_edit = QLineEdit()
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.api_key_edit.setPlaceholderText("Uses DASHSCOPE_API_KEY or .env.local when empty")
+        self.save_api_key_button = QPushButton("Save")
         self.key_source_label = QLabel(self._key_source_text())
 
         self.generate_button = QPushButton("Generate And Add")
@@ -143,6 +146,9 @@ class QwenLabPanel(QWidget):
         self.result_list.clear()
         self.add_asset_records(records)
 
+    def latest_asset_path(self) -> Path | None:
+        return self._records[-1].image_path if self._records else None
+
     def set_generating(self, generating: bool) -> None:
         self.generate_button.setEnabled(not generating)
         self.generate_button.setText("Generating..." if generating else "Generate And Add")
@@ -182,7 +188,7 @@ class QwenLabPanel(QWidget):
         generation_form.addRow("Size", size_widget)
         generation_form.addRow("Count", self.count_spin)
         generation_form.addRow("Background", self.background_combo)
-        generation_form.addRow("Qwen API key", self.api_key_edit)
+        generation_form.addRow("Qwen API key", self._api_key_row())
         generation_form.addRow("Key source", self.key_source_label)
         generation_form.addRow("Model", self.model_edit)
         generation_form.addRow("Endpoint", self.endpoint_edit)
@@ -208,6 +214,7 @@ class QwenLabPanel(QWidget):
 
     def _connect_signals(self) -> None:
         self.generate_button.clicked.connect(self._on_generate_clicked)
+        self.save_api_key_button.clicked.connect(self._on_save_api_key_clicked)
         self.rebuild_prompt_button.clicked.connect(self._refresh_prompt_editor)
         self.api_key_edit.textChanged.connect(lambda text: self.key_source_label.setText(self._key_source_text()))
         self.description_edit.textChanged.connect(self._refresh_prompt_editor)
@@ -223,6 +230,15 @@ class QwenLabPanel(QWidget):
             return
         self._save_settings()
         self.generateRequested.emit(request, prompt, self.config())
+
+    def _on_save_api_key_clicked(self) -> None:
+        try:
+            env_path = save_local_env_value("DASHSCOPE_API_KEY", self.api_key_edit.text())
+        except (OSError, ValueError) as exc:
+            self.set_status_message(f"Could not save Qwen API key: {exc}")
+            return
+        self.key_source_label.setText(f"Saved to {env_path.name}; CLI uses DASHSCOPE_API_KEY")
+        self.set_status_message(f"Saved Qwen API key to {env_path}")
 
     def _refresh_prompt_editor(self) -> None:
         if len(self._description()) < 2:
@@ -291,10 +307,19 @@ class QwenLabPanel(QWidget):
 
     def _key_source_text(self) -> str:
         if hasattr(self, "api_key_edit") and self.api_key_edit.text().strip():
-            return "Using pasted session key"
+            return "Using key in field"
         if config_value("DASHSCOPE_API_KEY"):
             return "Configured from environment or .env.local"
         return "Not configured; paste a key above"
+
+    def _api_key_row(self) -> QWidget:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self.api_key_edit, 1)
+        row.addWidget(self.save_api_key_button)
+        widget = QWidget()
+        widget.setLayout(row)
+        return widget
 
     def _combo(self, values: tuple[str, ...], labels: dict[str, str]) -> QComboBox:
         combo = QComboBox()

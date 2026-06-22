@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QUrl, Qt
 from PySide6.QtCore import QThread
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
@@ -33,6 +34,8 @@ from pixelator.gui.preview import PreviewWidget, clamp_crop
 from pixelator.gui.qwen_lab_panel import QwenLabPanel
 from pixelator.gui.queue_panel import QueuePanel
 from pixelator.gui.settings_panel import SettingsPanel
+from pixelator.gui.super_resolution_panel import SuperResolutionPanel
+from pixelator.gui.super_resolution_worker import SuperResolutionWorker
 from pixelator.gui.worker import RenderWorker
 from pixelator.image_io import load_static_image
 from pixelator.media import iter_image_files, is_image_path, is_video_path
@@ -53,11 +56,15 @@ class MainWindow(QMainWindow):
         self._ai_thread: QThread | None = None
         self._ai_worker: AiGenerationWorker | None = None
         self._active_ai_panel = None
+        self._super_resolution_thread: QThread | None = None
+        self._super_resolution_worker: SuperResolutionWorker | None = None
+        self._recent_qwen_output_path: Path | None = None
         self.queue_panel = QueuePanel()
         self.settings_panel = SettingsPanel()
         self.palette_panel = PalettePanel()
         self.ai_panel = AiAssetsPanel()
         self.qwen_lab_panel = QwenLabPanel()
+        self.super_resolution_panel = SuperResolutionPanel()
         self.preview_widget = PreviewWidget()
         self._global_render_settings = self.settings_panel.settings()
         self._shared_palette_snapshot = self.palette_panel.snapshot()
@@ -139,6 +146,7 @@ class MainWindow(QMainWindow):
         self.right_tabs.addTab(self.palette_panel, "Palette")
         self.right_tabs.addTab(self.ai_panel, "AI Assets")
         self.right_tabs.addTab(self.qwen_lab_panel, "Qwen Lab")
+        self.right_tabs.addTab(self.super_resolution_panel, "Super Resolution / 超分")
         top_splitter.addWidget(self.right_tabs)
         top_splitter.setSizes([260, 680, 320])
 
@@ -212,6 +220,7 @@ class MainWindow(QMainWindow):
         self.queue_panel.start_button.clicked.connect(self._start_queue)
         self.queue_panel.cancel_button.clicked.connect(self._cancel_selected_job)
         self.queue_panel.list_widget.currentItemChanged.connect(self._on_selected_job_changed)
+        self.queue_panel.mediaFilesDropped.connect(self.add_media_paths)
         self.settings_panel.settingsChanged.connect(self._on_settings_changed)
         self.settings_panel.customize_button.clicked.connect(self._customize_selected_job_settings)
         self.settings_panel.use_global_button.clicked.connect(self._use_global_settings_for_selected_job)
@@ -221,6 +230,12 @@ class MainWindow(QMainWindow):
         self.ai_panel.generateRequested.connect(self._start_ai_generation)
         self.ai_panel.addAssetToQueueRequested.connect(self._add_ai_asset_to_queue)
         self.qwen_lab_panel.generateRequested.connect(self._start_qwen_lab_generation)
+        self.super_resolution_panel.upscaleRequested.connect(self._start_super_resolution)
+        self.super_resolution_panel.useQueueImageRequested.connect(self._use_selected_queue_image_for_super_resolution)
+        self.super_resolution_panel.useRecentQwenRequested.connect(self._use_recent_qwen_output_for_super_resolution)
+        self.super_resolution_panel.openOutputDirectoryRequested.connect(self._open_super_resolution_output_dir)
+        self.super_resolution_panel.addOutputToQueueRequested.connect(self._add_super_resolution_output_to_queue)
+        self.super_resolution_panel.setReferenceRequested.connect(self._set_super_resolution_output_as_reference)
         self.preview_widget.cropChanged.connect(self._on_crop_changed)
         self.trim_start_spin.valueChanged.connect(lambda value: self._on_trim_changed())
         self.trim_end_spin.valueChanged.connect(lambda value: self._on_trim_changed())
@@ -495,15 +510,22 @@ class MainWindow(QMainWindow):
     def _settings_for_job(self, job: VideoJob) -> RenderSettings:
         settings = job.settings_override or self._global_render_settings
         palette_snapshot = self._palette_snapshot_for_job(job)
-        custom_palette = palette_snapshot.render_colors if len(palette_snapshot.render_colors) >= 2 else None
-        source_palette = (
-            palette_snapshot.source_colors
-            if palette_snapshot.auto_match
-            and len(palette_snapshot.source_colors) >= 2
-            and len(palette_snapshot.render_colors) >= 2
-            else None
-        )
-        palette_strategy = "auto_match" if custom_palette and source_palette else "custom"
+        custom_palette = None
+        source_palette = None
+        palette_strategy = settings.palette_strategy
+        if settings.palette_strategy != "original":
+            custom_palette = palette_snapshot.render_colors if len(palette_snapshot.render_colors) >= 2 else None
+            source_palette = (
+                palette_snapshot.source_colors
+                if palette_snapshot.auto_match
+                and len(palette_snapshot.source_colors) >= 2
+                and len(palette_snapshot.render_colors) >= 2
+                else None
+            )
+            if custom_palette and source_palette:
+                palette_strategy = "auto_match"
+            elif custom_palette:
+                palette_strategy = "custom"
         return replace(
             settings,
             crop=job.crop,
@@ -584,6 +606,8 @@ class MainWindow(QMainWindow):
     def _on_ai_generation_completed(self, records) -> None:
         self.ai_panel.add_asset_records(records)
         self.ai_panel.set_status_message(f"Saved {len(records)} AI asset(s)")
+        if records:
+            self._recent_qwen_output_path = records[-1].image_path
         self.append_log(f"Generated {len(records)} AI asset(s) in {self._ai_output_dir()}")
 
     def _on_qwen_lab_generation_completed(self, records) -> None:
@@ -591,6 +615,7 @@ class MainWindow(QMainWindow):
         self.qwen_lab_panel.set_status_message(f"Saved and queued {len(records)} AI asset(s)")
         paths = [record.image_path for record in records]
         if paths:
+            self._recent_qwen_output_path = paths[-1]
             self.add_media_paths(paths)
         self.append_log(f"Qwen Lab generated and queued {len(records)} AI asset(s) in {self._ai_output_dir()}")
 
@@ -618,9 +643,97 @@ class MainWindow(QMainWindow):
         records = AssetStore(self._ai_output_dir()).load_records()
         self.ai_panel.load_asset_records(records)
         self.qwen_lab_panel.load_asset_records(records)
+        if records:
+            self._recent_qwen_output_path = records[-1].image_path
 
     def _ai_output_dir(self) -> Path:
         return self.settings_panel.output_folder() / "ai-assets"
+
+    def _super_resolution_output_dir(self) -> Path:
+        return self.settings_panel.output_folder() / "super-resolution"
+
+    def _start_super_resolution(self, options) -> None:
+        if self._super_resolution_thread is not None:
+            self.append_log("Super resolution already running.")
+            return
+        self.super_resolution_panel.set_running(True)
+        thread = QThread(self)
+        worker = SuperResolutionWorker(options, self._super_resolution_output_dir())
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.logMessage.connect(self.append_log)
+        worker.completed.connect(self._on_super_resolution_completed)
+        worker.failed.connect(self._on_super_resolution_failed)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self._on_super_resolution_thread_finished)
+        self._super_resolution_thread = thread
+        self._super_resolution_worker = worker
+        thread.start()
+
+    def _on_super_resolution_completed(self, result) -> None:
+        self.super_resolution_panel.set_result(result)
+        self.append_log(f"Super resolution wrote {result.output_path}")
+
+    def _on_super_resolution_failed(self, error: str) -> None:
+        self.super_resolution_panel.set_error(error)
+        self.append_log(f"Super resolution failed: {error}")
+
+    def _on_super_resolution_thread_finished(self) -> None:
+        self._super_resolution_thread = None
+        self._super_resolution_worker = None
+        self.super_resolution_panel.set_running(False)
+
+    def _use_selected_queue_image_for_super_resolution(self) -> None:
+        job = self._job_by_id(self.queue_panel.selected_job_id())
+        if job is None:
+            self.super_resolution_panel.set_error("Select an image in the queue first.")
+            return
+        if not job.is_image:
+            self.super_resolution_panel.set_error("Super resolution source must be an image queue item.")
+            return
+        try:
+            self.super_resolution_panel.set_source_path(job.source_path, f"Current queue: {job.source_path}")
+        except PixelatorError as exc:
+            self.super_resolution_panel.set_error(str(exc))
+
+    def _use_recent_qwen_output_for_super_resolution(self) -> None:
+        path = self._recent_qwen_output_path or self.qwen_lab_panel.latest_asset_path() or self.ai_panel.latest_asset_path()
+        if path is None:
+            self.super_resolution_panel.set_error("No recent Qwen output found.")
+            return
+        try:
+            self.super_resolution_panel.set_source_path(path, f"Recent Qwen: {path}")
+        except PixelatorError as exc:
+            self.super_resolution_panel.set_error(str(exc))
+
+    def _open_super_resolution_output_dir(self) -> None:
+        output_dir = self._super_resolution_output_dir()
+        output_dir.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(output_dir.resolve())))
+
+    def _add_super_resolution_output_to_queue(self, path: str) -> None:
+        output_path = Path(path)
+        if not output_path.exists():
+            self.append_log(f"Super-resolution output not found: {output_path}")
+            return
+        self.add_media_paths([output_path])
+        self.append_log(f"Added super-resolution output to queue: {output_path.name}")
+
+    def _set_super_resolution_output_as_reference(self, path: str) -> None:
+        output_path = Path(path)
+        if not output_path.exists():
+            self.append_log(f"Super-resolution output not found: {output_path}")
+            return
+        try:
+            image = load_static_image(output_path)
+        except PixelatorError as exc:
+            self.append_log(f"Could not set reference image: {exc}")
+            return
+        self.palette_panel.extract_from_image(image, output_path.name)
+        self.right_tabs.setCurrentWidget(self.palette_panel)
+        self.append_log(f"Set super-resolution output as palette reference: {output_path.name}")
 
     def _refresh_queue(self) -> None:
         selected = self.queue_panel.selected_job_id()

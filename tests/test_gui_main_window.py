@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 from pixelator.config import CropConfig
 from pixelator.gui.models import VideoJob
 from pixelator.gui.main_window import MainWindow
+from pixelator.ai.super_resolution import SuperResolutionResult
 from pixelator.video import VideoMetadata
 
 
@@ -226,6 +227,62 @@ def test_add_image_path_loads_preview_and_disables_timeline(tmp_path: Path, qapp
     window.close()
 
 
+def test_queue_panel_dropped_media_paths_add_to_queue(tmp_path: Path, qapp):
+    source = tmp_path / "dropped.png"
+    Image.new("RGB", (4, 3), (0, 255, 0)).save(source)
+
+    window = MainWindow()
+    window.queue_panel.mediaFilesDropped.emit([str(source)])
+
+    assert len(window.queue.jobs) == 1
+    assert window.queue.jobs[0].source_path == source
+    assert window.queue.jobs[0].is_image
+    window.close()
+
+
+def test_super_resolution_uses_selected_queue_image(tmp_path: Path, qapp):
+    source = tmp_path / "source.png"
+    Image.new("RGB", (6, 4), (255, 0, 0)).save(source)
+    window = MainWindow()
+    window.add_media_paths([source])
+
+    window._use_selected_queue_image_for_super_resolution()
+
+    assert window.super_resolution_panel.options().source_path == source
+    assert window.super_resolution_panel.before_size_label.text() == "Before: 6 x 4"
+    window.close()
+
+
+def test_main_window_adds_super_resolution_output_to_queue_and_reference(tmp_path: Path, qapp):
+    source = tmp_path / "source.png"
+    output = tmp_path / "source_sr2x.png"
+    Image.new("RGB", (2, 2), (255, 0, 0)).save(source)
+    image = Image.new("RGB", (2, 1))
+    image.putdata([(255, 0, 0), (0, 0, 255)])
+    image.save(output)
+    window = MainWindow()
+
+    result = SuperResolutionResult(
+        source_path=source,
+        output_path=output,
+        source_url=None,
+        output_url="https://example.test/out.png",
+        before_size=(2, 2),
+        after_size=(2, 1),
+        upscale_factor=2,
+        output_format="png",
+    )
+    window._on_super_resolution_completed(result)
+    window._add_super_resolution_output_to_queue(str(output))
+    window._set_super_resolution_output_as_reference(str(output))
+
+    assert window.super_resolution_panel.status_label.text() == "succeeded"
+    assert window.queue.jobs[0].source_path == output
+    assert window.palette_panel.source_colors()
+    assert window.right_tabs.currentWidget() is window.palette_panel
+    window.close()
+
+
 def test_add_image_folder_batches_supported_images(tmp_path: Path, qapp):
     first = tmp_path / "b.png"
     second = tmp_path / "a.jpg"
@@ -392,11 +449,12 @@ def test_image_crop_controls_preserve_odd_dimensions(tmp_path: Path, qapp):
 def test_right_side_splits_render_and_palette_tabs(qapp):
     window = MainWindow()
 
-    assert window.right_tabs.count() == 4
+    assert window.right_tabs.count() == 5
     assert window.right_tabs.tabText(0) == "Render"
     assert window.right_tabs.tabText(1) == "Palette"
     assert window.right_tabs.tabText(2) == "AI Assets"
     assert window.right_tabs.tabText(3) == "Qwen Lab"
+    assert window.right_tabs.tabText(4) == "Super Resolution / 超分"
     window.close()
 
 
@@ -410,6 +468,21 @@ def test_main_window_carries_custom_palette_to_render_settings(tmp_path: Path, q
 
     assert settings.custom_palette == ["#000000", "#ffcc00"]
     assert settings.to_config().palette.strategy == "custom"
+    window.close()
+
+
+def test_main_window_original_colors_ignores_palette_panel(tmp_path: Path, qapp):
+    source = tmp_path / "texture.png"
+    job = VideoJob(source_path=source, media_type="image")
+    window = MainWindow()
+    window.palette_panel.set_source_and_render_colors(["#000000", "#ffcc00"])
+    window.settings_panel.palette_strategy_combo.setCurrentText("Original Colors")
+
+    settings = window._settings_for_job(job)
+
+    assert settings.custom_palette is None
+    assert settings.source_palette is None
+    assert settings.to_config().palette.strategy == "original"
     window.close()
 
 

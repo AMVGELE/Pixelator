@@ -154,8 +154,10 @@ def validate_config(config: RenderConfig) -> None:
         raise ConfigError("palette.sample_frames must be at least 1")
     if config.palette.match_sort not in {"original", "brightness", "hue", "hue_brightness", "saturation"}:
         raise ConfigError("palette.match_sort must be original, brightness, hue, hue_brightness, or saturation")
-    if config.palette.strategy not in {"per_frame", "global_sampled", "custom", "auto_match"}:
-        raise ConfigError("palette.strategy must be 'per_frame', 'global_sampled', 'custom', or 'auto_match'")
+    if config.palette.strategy not in {"per_frame", "global_sampled", "custom", "auto_match", "original"}:
+        raise ConfigError(
+            "palette.strategy must be 'per_frame', 'global_sampled', 'custom', 'auto_match', or 'original'"
+        )
     if config.palette.strategy in {"custom", "auto_match"}:
         if config.palette.custom_colors is None:
             raise ConfigError("palette.custom_colors must contain 2 to 256 colors")

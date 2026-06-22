@@ -7,6 +7,7 @@ import pytest
 from PIL import Image
 from PySide6.QtWidgets import QApplication
 
+from pixelator.ai.env import config_value, local_env_values
 from pixelator.ai.types import AiAssetRecord
 from pixelator.gui.ai_panel import AiAssetsPanel
 from pixelator.gui.main_window import MainWindow
@@ -36,9 +37,26 @@ def test_ai_panel_exposes_qwen_key_in_provider_settings(qapp):
     panel = AiAssetsPanel()
 
     assert panel.api_key_edit.placeholderText() == "Uses DASHSCOPE_API_KEY or .env.local when empty"
+    assert panel.save_api_key_button.text() == "Save"
     panel.api_key_edit.setText("session-key")
 
-    assert panel.key_source_label.text() == "Using pasted session key"
+    assert panel.key_source_label.text() == "Using key in field"
+
+
+def test_ai_panel_saves_qwen_key_for_cli(monkeypatch, tmp_path: Path, qapp):
+    env_file = tmp_path / ".env.local"
+    monkeypatch.setenv("PIXELATOR_ENV_FILE", str(env_file))
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    local_env_values.cache_clear()
+    panel = AiAssetsPanel()
+
+    panel.api_key_edit.setText("saved-gui-key")
+    panel.save_api_key_button.click()
+
+    assert env_file.read_text(encoding="utf-8") == "DASHSCOPE_API_KEY=saved-gui-key\n"
+    assert config_value("DASHSCOPE_API_KEY") == "saved-gui-key"
+    assert panel.key_source_label.text() == "Saved to .env.local; CLI uses DASHSCOPE_API_KEY"
+    assert "Saved Qwen API key" in panel.status_label.text()
 
 
 def test_ai_panel_preserves_status_when_generation_stops(qapp):
@@ -53,7 +71,7 @@ def test_ai_panel_preserves_status_when_generation_stops(qapp):
 def test_main_window_has_ai_assets_tab(qapp):
     window = MainWindow()
 
-    assert window.right_tabs.count() == 4
+    assert window.right_tabs.count() == 5
     assert window.right_tabs.tabText(2) == "AI Assets"
     window.close()
 

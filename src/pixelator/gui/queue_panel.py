@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from pathlib import Path
+
+from PySide6.QtCore import QEvent, QMimeData, Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -12,17 +14,25 @@ from PySide6.QtWidgets import (
 )
 
 from pixelator.gui.models import VideoJob
+from pixelator.media import is_media_path
 
 
 class QueuePanel(QWidget):
+    mediaFilesDropped = Signal(list)
+
     def __init__(self) -> None:
         super().__init__()
+        self.setAcceptDrops(True)
         self.add_button = QPushButton("Add")
         self.folder_button = QPushButton("Folder")
         self.remove_button = QPushButton("Remove")
         self.start_button = QPushButton("Start")
         self.cancel_button = QPushButton("Cancel")
         self.list_widget = QListWidget()
+        self.list_widget.setAcceptDrops(True)
+        self.list_widget.viewport().setAcceptDrops(True)
+        self.list_widget.installEventFilter(self)
+        self.list_widget.viewport().installEventFilter(self)
 
         title = QLabel("Queue")
         title.setObjectName("panelTitle")
@@ -65,3 +75,48 @@ class QueuePanel(QWidget):
             return None
         value = item.data(Qt.ItemDataRole.UserRole)
         return str(value) if value else None
+
+    def dragEnterEvent(self, event) -> None:
+        self._handle_drag_event(event)
+
+    def dragMoveEvent(self, event) -> None:
+        self._handle_drag_event(event)
+
+    def dropEvent(self, event) -> None:
+        self._handle_drop_event(event)
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched in (self.list_widget, self.list_widget.viewport()):
+            if event.type() in (QEvent.Type.DragEnter, QEvent.Type.DragMove):
+                return self._handle_drag_event(event)
+            if event.type() == QEvent.Type.Drop:
+                return self._handle_drop_event(event)
+        return super().eventFilter(watched, event)
+
+    def _handle_drag_event(self, event) -> bool:
+        if self._media_files_from_mime_data(event.mimeData()):
+            event.acceptProposedAction()
+            return True
+        event.ignore()
+        return False
+
+    def _handle_drop_event(self, event) -> bool:
+        paths = self._media_files_from_mime_data(event.mimeData())
+        if not paths:
+            event.ignore()
+            return False
+        self.mediaFilesDropped.emit(paths)
+        event.acceptProposedAction()
+        return True
+
+    def _media_files_from_mime_data(self, mime_data: QMimeData) -> list[str]:
+        if not mime_data.hasUrls():
+            return []
+        paths = []
+        for url in mime_data.urls():
+            if not url.isLocalFile():
+                continue
+            path = Path(url.toLocalFile())
+            if path.is_file() and is_media_path(path):
+                paths.append(str(path))
+        return paths

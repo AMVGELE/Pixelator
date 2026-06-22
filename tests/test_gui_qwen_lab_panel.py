@@ -7,6 +7,7 @@ import pytest
 from PIL import Image
 from PySide6.QtWidgets import QApplication
 
+from pixelator.ai.env import config_value, local_env_values
 from pixelator.ai.types import AiAssetRecord
 from pixelator.gui.main_window import MainWindow
 from pixelator.gui.qwen_lab_panel import QwenLabPanel
@@ -39,6 +40,22 @@ def test_qwen_lab_panel_starts_with_empty_prompt_editor(qapp):
     assert panel.negative_prompt_edit.toPlainText() == ""
 
 
+def test_qwen_lab_panel_saves_qwen_key_for_cli(monkeypatch, tmp_path: Path, qapp):
+    env_file = tmp_path / ".env.local"
+    monkeypatch.setenv("PIXELATOR_ENV_FILE", str(env_file))
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    local_env_values.cache_clear()
+    panel = QwenLabPanel()
+
+    panel.api_key_edit.setText("saved-lab-key")
+    panel.save_api_key_button.click()
+
+    assert env_file.read_text(encoding="utf-8") == "DASHSCOPE_API_KEY=saved-lab-key\n"
+    assert config_value("DASHSCOPE_API_KEY") == "saved-lab-key"
+    assert panel.key_source_label.text() == "Saved to .env.local; CLI uses DASHSCOPE_API_KEY"
+    assert "Saved Qwen API key" in panel.status_label.text()
+
+
 def test_qwen_lab_panel_builds_dynamic_resolution_request(qapp):
     panel = QwenLabPanel()
 
@@ -69,7 +86,7 @@ def test_qwen_lab_panel_rejects_size_outside_qwen_pixel_budget(qapp):
 def test_main_window_has_qwen_lab_tab(qapp):
     window = MainWindow()
 
-    assert window.right_tabs.count() == 4
+    assert window.right_tabs.count() == 5
     assert window.right_tabs.tabText(2) == "AI Assets"
     assert window.right_tabs.tabText(3) == "Qwen Lab"
     window.close()
@@ -86,6 +103,20 @@ def test_main_window_auto_adds_qwen_lab_outputs_to_queue(tmp_path: Path, qapp):
     assert window.qwen_lab_panel.result_list.count() == 1
     assert len(window.queue.jobs) == 1
     assert window.queue.jobs[0].source_path == source
+    window.close()
+
+
+def test_main_window_uses_recent_qwen_output_for_super_resolution(tmp_path: Path, qapp):
+    source = tmp_path / "lab_asset.png"
+    Image.new("RGBA", (5, 6), (255, 0, 0, 255)).save(source)
+    window = MainWindow()
+    record = _record(source)
+
+    window._on_qwen_lab_generation_completed([record])
+    window._use_recent_qwen_output_for_super_resolution()
+
+    assert window.super_resolution_panel.options().source_path == source
+    assert window.super_resolution_panel.before_size_label.text() == "Before: 5 x 6"
     window.close()
 
 

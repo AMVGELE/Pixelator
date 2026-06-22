@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSignalBlocker, Signal
+from PySide6.QtCore import QSignalBlocker, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -34,6 +35,10 @@ class SettingsPanel(QWidget):
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(["stable", "fast"])
 
+        self.palette_strategy_combo = QComboBox()
+        self.palette_strategy_combo.addItem("Automatic Palette", "global_sampled")
+        self.palette_strategy_combo.addItem("Original Colors", "original")
+
         self.pixel_scale_spin = QSpinBox()
         self.pixel_scale_spin.setRange(1, 64)
         self.pixel_scale_spin.setValue(4)
@@ -63,7 +68,9 @@ class SettingsPanel(QWidget):
 
         self.output_folder_edit = QLineEdit(str(Path("outputs")))
         self.output_browse_button = QPushButton("Browse")
+        self.output_open_button = QPushButton("OpenOutputDir")
         self.output_browse_button.clicked.connect(self._choose_output_folder)
+        self.output_open_button.clicked.connect(self._open_output_folder)
 
         title = QLabel("Render Settings")
         title.setObjectName("panelTitle")
@@ -75,6 +82,7 @@ class SettingsPanel(QWidget):
 
         form = QFormLayout()
         form.addRow("Mode", self.mode_combo)
+        form.addRow("Palette", self.palette_strategy_combo)
         form.addRow("Pixel scale", self.pixel_scale_spin)
         form.addRow("Colors", self.colors_spin)
         form.addRow("Brightness", self.brightness_spin)
@@ -89,6 +97,7 @@ class SettingsPanel(QWidget):
         output_row = QHBoxLayout()
         output_row.addWidget(self.output_folder_edit, 1)
         output_row.addWidget(self.output_browse_button)
+        output_row.addWidget(self.output_open_button)
         form.addRow("Output folder", output_row)
 
         layout = QVBoxLayout(self)
@@ -102,6 +111,7 @@ class SettingsPanel(QWidget):
     def settings(self) -> RenderSettings:
         return RenderSettings(
             mode=self.mode_combo.currentText(),
+            palette_strategy=str(self.palette_strategy_combo.currentData() or "global_sampled"),
             pixel_scale=self.pixel_scale_spin.value(),
             colors=self.colors_spin.value(),
             brightness=self.brightness_spin.value(),
@@ -118,6 +128,7 @@ class SettingsPanel(QWidget):
         blockers = [QSignalBlocker(widget) for widget in self._setting_widgets()]
         try:
             self.mode_combo.setCurrentText(settings.mode)
+            self._set_combo_data(self.palette_strategy_combo, settings.palette_strategy)
             self.pixel_scale_spin.setValue(settings.pixel_scale)
             self.colors_spin.setValue(settings.colors)
             self.brightness_spin.setValue(settings.brightness)
@@ -128,6 +139,7 @@ class SettingsPanel(QWidget):
             self.keep_audio_check.setChecked(settings.keep_audio)
             self.overwrite_check.setChecked(settings.overwrite)
             self.output_format_combo.setCurrentText(settings.output_format.upper())
+            self._update_palette_controls()
         finally:
             del blockers
 
@@ -144,6 +156,11 @@ class SettingsPanel(QWidget):
         if selected:
             self.output_folder_edit.setText(selected)
 
+    def _open_output_folder(self) -> None:
+        output_dir = self.output_folder()
+        output_dir.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(output_dir.resolve())))
+
     def _factor_spin(self, value: float) -> QDoubleSpinBox:
         spin = QDoubleSpinBox()
         spin.setRange(0.1, 4.0)
@@ -153,8 +170,15 @@ class SettingsPanel(QWidget):
         return spin
 
     def _connect_setting_signals(self) -> None:
-        for combo in (self.mode_combo, self.crt_combo, self.vhs_combo, self.output_format_combo):
+        for combo in (
+            self.mode_combo,
+            self.palette_strategy_combo,
+            self.crt_combo,
+            self.vhs_combo,
+            self.output_format_combo,
+        ):
             combo.currentIndexChanged.connect(lambda index: self.settingsChanged.emit())
+        self.palette_strategy_combo.currentIndexChanged.connect(lambda index: self._update_palette_controls())
         for spin in (
             self.pixel_scale_spin,
             self.colors_spin,
@@ -169,6 +193,7 @@ class SettingsPanel(QWidget):
     def _setting_widgets(self) -> list[QWidget]:
         return [
             self.mode_combo,
+            self.palette_strategy_combo,
             self.pixel_scale_spin,
             self.colors_spin,
             self.brightness_spin,
@@ -180,3 +205,13 @@ class SettingsPanel(QWidget):
             self.overwrite_check,
             self.output_format_combo,
         ]
+
+    def _update_palette_controls(self) -> None:
+        self.colors_spin.setEnabled(self.palette_strategy_combo.currentData() != "original")
+
+    def _set_combo_data(self, combo: QComboBox, value: str) -> None:
+        for index in range(combo.count()):
+            if combo.itemData(index) == value:
+                combo.setCurrentIndex(index)
+                return
+        combo.setCurrentIndex(0)

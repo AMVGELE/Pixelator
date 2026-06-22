@@ -79,14 +79,16 @@ class RenderSettings:
     output_format: str = "mp4"
     custom_palette: list[str] | None = None
     source_palette: list[str] | None = None
-    palette_strategy: str = "custom"
+    palette_strategy: str = "global_sampled"
     palette_match_sort: str = "hue_brightness"
     crop: CropConfig | None = None
     trim: TrimConfig | None = None
 
     def to_config(self) -> RenderConfig:
         palette = PaletteConfig(colors=self.colors)
-        if self.palette_strategy == "auto_match" and self.custom_palette and self.source_palette:
+        if self.palette_strategy == "original":
+            palette = PaletteConfig(strategy="original", colors=self.colors)
+        elif self.palette_strategy == "auto_match" and self.custom_palette and self.source_palette:
             palette = PaletteConfig(
                 strategy="auto_match",
                 colors=self.colors,
