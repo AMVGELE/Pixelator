@@ -12,6 +12,7 @@ from pixelator.config import (
     merge_cli_overrides,
     validate_config,
 )
+from pixelator.style_filters import STYLE_FILTERS
 
 
 def test_default_config_uses_stable_mode():
@@ -79,19 +80,21 @@ def test_load_dark_fantasy_dither_preset():
 def test_load_builtin_style_filter_presets():
     preset_dir = Path(__file__).parents[1] / "presets"
 
-    for filename in (
-        "cold-sci-fi-dither.yaml",
-        "amber-ruin-dither.yaml",
-        "noir-blue-dither.yaml",
-        "muted-green-dither.yaml",
-    ):
+    for style in [style for style in STYLE_FILTERS if style.palette]:
+        filename = f"{style.id.replace('_', '-')}.yaml"
         config = load_config(preset_dir / filename)
 
         assert config.mode == "stable"
-        assert config.palette.colors == 7
-        assert config.effects.dither == "ordered"
-        assert config.effects.dither_ramp == "tone"
-        assert config.effects.dither_space == "pixel"
+        assert config.pixel.scale == style.pixel_scale
+        assert config.palette.colors == style.colors
+        assert config.palette.custom_colors == style.palette
+        assert config.image.brightness == style.brightness
+        assert config.image.sharpness == style.sharpness
+        assert config.image.saturation == style.saturation
+        assert config.effects.dither == style.dither
+        assert config.effects.dither_ramp == style.dither_ramp
+        assert config.effects.dither_space == style.dither_space
+        assert config.effects.dither_strength == style.dither_strength
 
 
 def test_load_config_accepts_custom_palette_colors(tmp_path: Path):

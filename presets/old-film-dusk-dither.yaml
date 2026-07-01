@@ -1,0 +1,38 @@
+mode: stable
+pixel:
+  scale: 2
+palette:
+  strategy: custom
+  colors: 7
+  sample_frames: 64
+  custom_colors:
+    - "#171412"
+    - "#28201c"
+    - "#3b2d27"
+    - "#554037"
+    - "#745b45"
+    - "#967955"
+    - "#d2aa6d"
+image:
+  brightness: 0.98
+  sharpness: 1.1
+  saturation: 0.68
+effects:
+  crt: off
+  vhs: off
+  dither: ordered
+  dither_ramp: tone
+  dither_space: pixel
+  dither_strength: 0.82
+  dither_scale: 4
+  dither_angle: 0.0
+  chroma_offset: 1
+  noise_amount: 0.006
+performance:
+  workers: auto
+  preview_seconds: null
+output:
+  keep_audio: true
+  codec: libx264
+  overwrite: false
+  audio_failure: stop

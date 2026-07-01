@@ -237,20 +237,36 @@ per-pixel color noise, so it should not shatter solid pixel blocks.
 
 The desktop GUI is localized in Chinese and includes a `风格滤镜` selector. The
 built-in dither filters include `暗黑幻想抖动`, `冷色科幻抖动`, `琥珀废墟抖动`,
-`蓝黑夜景抖动`, and `低饱和灰绿抖动`. Each filter fills in pixel scale, image
-adjustment, dither settings, and a default palette. `调色盘模式` can use the fixed
-palette, generate an automatic unified palette from the current preview frame,
-or generate an automatic palette that preserves saturated red, blue, and white
-lights.
+`蓝黑夜景抖动`, `低饱和灰绿抖动`, `铁锈工业抖动`, `病态霓虹抖动`,
+`月光石堡抖动`, `血色警报抖动`, `沙尘废土抖动`, `深海舱室抖动`,
+`旧胶片黄昏抖动`, and `灰紫梦境抖动`. Each filter fills in pixel scale, image
+adjustment, dither settings, and a default palette. `调色盘模式` can use the
+fixed palette, generate an automatic unified palette from the current preview
+frame, or generate an automatic palette that preserves saturated red, blue, and
+white lights.
 
 The matching CLI presets are:
 
 ```bash
 pixelator input.mp4 --config presets/dark-fantasy-dither.yaml --out output-dark-fantasy.mp4
-pixelator input.mp4 --config presets/cold-sci-fi-dither.yaml --out output-cold-sci-fi.mp4
-pixelator input.mp4 --config presets/amber-ruin-dither.yaml --out output-amber-ruin.mp4
-pixelator input.mp4 --config presets/noir-blue-dither.yaml --out output-noir-blue.mp4
-pixelator input.mp4 --config presets/muted-green-dither.yaml --out output-muted-green.mp4
+```
+
+Available dither preset files:
+
+```text
+presets/dark-fantasy-dither.yaml
+presets/cold-sci-fi-dither.yaml
+presets/amber-ruin-dither.yaml
+presets/noir-blue-dither.yaml
+presets/muted-green-dither.yaml
+presets/rust-industrial-dither.yaml
+presets/sickly-neon-dither.yaml
+presets/moonlit-castle-dither.yaml
+presets/red-alert-dither.yaml
+presets/dust-wasteland-dither.yaml
+presets/deep-sea-module-dither.yaml
+presets/old-film-dusk-dither.yaml
+presets/ash-violet-dream-dither.yaml
 ```
 
 These presets enable ordered tone-ramp dithering for dark, low-color scenes with

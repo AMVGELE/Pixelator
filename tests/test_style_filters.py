@@ -5,9 +5,24 @@ from pixelator.style_filters import (
     PALETTE_MODE_AUTO_PRESERVE_LIGHTS,
     PALETTE_MODE_AUTO_UNIFIED,
     PALETTE_MODE_FIXED,
+    STYLE_FILTERS,
     generate_palette_for_style,
     style_filter_by_id,
 )
+
+
+def test_style_filter_ids_labels_and_palettes_are_valid():
+    ids = [style.id for style in STYLE_FILTERS]
+    labels = [style.label for style in STYLE_FILTERS]
+
+    assert len(ids) == len(set(ids))
+    assert len(labels) == len(set(labels))
+    for style in STYLE_FILTERS:
+        if not style.palette:
+            continue
+        assert len(style.palette) == style.colors
+        for color in style.palette:
+            parse_hex_color(color)
 
 
 def test_fixed_style_palette_uses_builtin_colors():
