@@ -21,6 +21,8 @@ def test_default_config_uses_stable_mode():
     assert config.palette.colors == 32
     assert config.effects.crt == "off"
     assert config.effects.vhs == "off"
+    assert config.effects.dither == "off"
+    assert config.effects.dither_space == "output"
     assert config.output.keep_audio is True
 
 
@@ -36,6 +38,12 @@ palette:
 effects:
   crt: off
   vhs: light
+  dither: ordered
+  dither_ramp: tone
+  dither_space: pixel
+  dither_strength: 0.7
+  dither_scale: 5
+  dither_angle: 45
 """.strip(),
         encoding="utf-8",
     )
@@ -47,6 +55,43 @@ effects:
     assert config.palette.colors == 16
     assert config.effects.crt == "off"
     assert config.effects.vhs == "light"
+    assert config.effects.dither == "ordered"
+    assert config.effects.dither_ramp == "tone"
+    assert config.effects.dither_space == "pixel"
+    assert config.effects.dither_strength == 0.7
+    assert config.effects.dither_scale == 5
+    assert config.effects.dither_angle == 45
+
+
+def test_load_dark_fantasy_dither_preset():
+    path = Path(__file__).parents[1] / "presets" / "dark-fantasy-dither.yaml"
+
+    config = load_config(path)
+
+    assert config.mode == "stable"
+    assert config.palette.colors == 7
+    assert config.effects.dither == "ordered"
+    assert config.effects.dither_ramp == "tone"
+    assert config.effects.dither_space == "pixel"
+    assert config.effects.dither_strength > 0
+
+
+def test_load_builtin_style_filter_presets():
+    preset_dir = Path(__file__).parents[1] / "presets"
+
+    for filename in (
+        "cold-sci-fi-dither.yaml",
+        "amber-ruin-dither.yaml",
+        "noir-blue-dither.yaml",
+        "muted-green-dither.yaml",
+    ):
+        config = load_config(preset_dir / filename)
+
+        assert config.mode == "stable"
+        assert config.palette.colors == 7
+        assert config.effects.dither == "ordered"
+        assert config.effects.dither_ramp == "tone"
+        assert config.effects.dither_space == "pixel"
 
 
 def test_load_config_accepts_custom_palette_colors(tmp_path: Path):
@@ -140,6 +185,34 @@ def test_invalid_palette_size_is_rejected():
     config = config_from_dict({"palette": {"colors": 1}})
 
     with pytest.raises(ConfigError, match="palette.colors"):
+        validate_config(config)
+
+
+def test_invalid_dither_mode_is_rejected():
+    config = config_from_dict({"effects": {"dither": "sparkle"}})
+
+    with pytest.raises(ConfigError, match="effects.dither"):
+        validate_config(config)
+
+
+def test_invalid_dither_ramp_is_rejected():
+    config = config_from_dict({"effects": {"dither_ramp": "rainbow"}})
+
+    with pytest.raises(ConfigError, match="dither_ramp"):
+        validate_config(config)
+
+
+def test_invalid_dither_space_is_rejected():
+    config = config_from_dict({"effects": {"dither_space": "screen"}})
+
+    with pytest.raises(ConfigError, match="dither_space"):
+        validate_config(config)
+
+
+def test_invalid_dither_strength_is_rejected():
+    config = config_from_dict({"effects": {"dither_strength": 1.5}})
+
+    with pytest.raises(ConfigError, match="dither_strength"):
         validate_config(config)
 
 

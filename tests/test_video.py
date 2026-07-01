@@ -184,3 +184,19 @@ def test_mux_audio_applies_trim_arguments(monkeypatch, tmp_path: Path):
     assert "1.25" in command
     assert "-t" in command
     assert "3.5" in command
+    assert "-shortest" not in command
+
+
+def test_mux_audio_uses_shortest_when_duration_is_unknown(monkeypatch, tmp_path: Path):
+    calls = {}
+
+    def fake_run(command, **kwargs):
+        calls["command"] = command
+        return SimpleNamespace(returncode=0, stderr="")
+
+    monkeypatch.setattr("pixelator.video.imageio_ffmpeg.get_ffmpeg_exe", lambda: "ffmpeg")
+    monkeypatch.setattr("pixelator.video.subprocess.run", fake_run)
+
+    mux_audio(tmp_path / "source.mp4", tmp_path / "silent.mp4", tmp_path / "output.mp4")
+
+    assert "-shortest" in calls["command"]

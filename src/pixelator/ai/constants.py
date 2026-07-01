@@ -8,41 +8,41 @@ ASSET_SIZES = ("64x64", "128x128", "256x256", "512x512")
 BACKGROUND_MODES = ("transparent", "solid", "scene")
 
 ASSET_TYPE_LABELS = {
-    "character": "Character",
-    "item": "Item",
-    "icon": "Icon",
-    "tile": "Tile",
-    "ui": "UI Element",
-    "background": "Background",
+    "character": "角色",
+    "item": "道具",
+    "icon": "图标",
+    "tile": "地块",
+    "ui": "UI 元素",
+    "background": "背景",
 }
 
 ART_STYLE_LABELS = {
-    "pixel_art": "Pixel Art",
-    "cartoon": "Cartoon",
-    "hand_drawn": "Hand Drawn",
-    "dark_fantasy": "Dark Fantasy",
-    "chibi": "Chibi",
+    "pixel_art": "像素风",
+    "cartoon": "卡通",
+    "hand_drawn": "手绘",
+    "dark_fantasy": "暗黑幻想",
+    "chibi": "Q 版",
 }
 
 GAME_GENRE_LABELS = {
     "rpg": "RPG",
-    "platformer": "Platformer",
-    "tower_defense": "Tower Defense",
+    "platformer": "平台跳跃",
+    "tower_defense": "塔防",
     "roguelike": "Roguelike",
-    "puzzle": "Puzzle",
+    "puzzle": "解谜",
 }
 
 VIEW_LABELS = {
-    "front": "Front",
-    "side": "Side",
-    "top_down": "Top Down",
-    "isometric": "Isometric",
+    "front": "正面",
+    "side": "侧面",
+    "top_down": "俯视",
+    "isometric": "等距",
 }
 
 BACKGROUND_LABELS = {
-    "transparent": "Transparent",
-    "solid": "Solid",
-    "scene": "Scene",
+    "transparent": "透明",
+    "solid": "纯色",
+    "scene": "场景",
 }
 
 ASSET_TYPE_PROMPT_PARTS = {

@@ -70,6 +70,66 @@ def test_process_frames_custom_palette_applies_after_effects():
     assert set(result[0].getdata()).issubset({(0, 0, 0), (255, 255, 255)})
 
 
+def test_process_frames_diamond_dither_stays_palette_bounded():
+    frames = [Image.linear_gradient("L").resize((16, 16)).convert("RGB")]
+    config = RenderConfig(
+        mode="fast",
+        pixel=PixelConfig(scale=1),
+        palette=PaletteConfig(colors=4),
+        effects=EffectsConfig(crt="off", vhs="off", dither="diamond", dither_strength=0.8),
+    )
+    metadata = VideoMetadata(width=16, height=16, fps=24.0)
+
+    result = list(process_frames(frames, config, metadata))
+
+    assert len(set(result[0].getdata())) <= 4
+    assert len(set(result[0].getdata())) > 2
+
+
+def test_process_frames_custom_palette_uses_dithered_final_mapping():
+    frames = [Image.linear_gradient("L").resize((16, 16)).convert("RGB")]
+    config = RenderConfig(
+        mode="fast",
+        pixel=PixelConfig(scale=1),
+        palette=PaletteConfig(strategy="custom", custom_colors=["#000000", "#808080", "#ffffff"]),
+        effects=EffectsConfig(crt="off", vhs="off", dither="ordered", dither_strength=0.8),
+    )
+    metadata = VideoMetadata(width=16, height=16, fps=24.0)
+
+    result = list(process_frames(frames, config, metadata))
+
+    assert set(result[0].getdata()).issubset({(0, 0, 0), (128, 128, 128), (255, 255, 255)})
+
+
+def test_process_frames_pixel_space_dither_upscales_finished_pixel_cells():
+    frames = [Image.linear_gradient("L").resize((16, 16)).convert("RGB")]
+    config = RenderConfig(
+        mode="fast",
+        pixel=PixelConfig(scale=4),
+        palette=PaletteConfig(strategy="custom", custom_colors=["#000000", "#ffffff"]),
+        effects=EffectsConfig(
+            crt="off",
+            vhs="off",
+            dither="ordered",
+            dither_ramp="tone",
+            dither_space="pixel",
+            dither_strength=1.0,
+            dither_scale=4,
+        ),
+    )
+    metadata = VideoMetadata(width=16, height=16, fps=24.0)
+
+    result = list(process_frames(frames, config, metadata))[0]
+
+    assert result.size == (16, 16)
+    assert set(result.getdata()).issubset({(0, 0, 0), (255, 255, 255)})
+    assert len(set(result.getdata())) > 1
+    for y in range(0, 16, 4):
+        for x in range(0, 16, 4):
+            block = {result.getpixel((block_x, block_y)) for block_y in range(y, y + 4) for block_x in range(x, x + 4)}
+            assert len(block) == 1
+
+
 def test_process_frames_auto_match_palette_applies_in_fast_and_stable_modes():
     frame = Image.new("RGB", (4, 4))
     frame.putdata([(250, 0, 0)] * 8 + [(0, 0, 250)] * 8)
@@ -240,6 +300,73 @@ def test_render_gif_input_to_video_skips_audio_mux(monkeypatch, tmp_path):
 
     assert output.read_bytes() == b"video"
     assert "write_video" in calls
+
+
+def test_render_video_limits_audio_to_known_output_duration(monkeypatch, tmp_path):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"fake")
+    output = tmp_path / "pixelated.mp4"
+    frames = [Image.new("RGB", (4, 4), (255, 0, 0))]
+    calls = {}
+
+    monkeypatch.setattr(
+        "pixelator.pipeline.probe_video",
+        lambda path: VideoMetadata(width=4, height=4, fps=12.0, duration=1 / 12.0),
+    )
+    monkeypatch.setattr("pixelator.pipeline.iter_frames", lambda path: iter(frames))
+
+    def fake_write_video(processed, silent_output, metadata, codec):
+        silent_output.write_bytes(b"video")
+
+    def fake_mux_audio(source_video, silent_video, final_output, start_seconds, duration_seconds):
+        calls["mux_audio"] = (source_video, silent_video, final_output, start_seconds, duration_seconds)
+        final_output.write_bytes(b"muxed")
+
+    monkeypatch.setattr("pixelator.pipeline.write_video", fake_write_video)
+    monkeypatch.setattr("pixelator.pipeline.mux_audio", fake_mux_audio)
+
+    render_video(source, output, RenderConfig(output=OutputConfig(keep_audio=True, overwrite=True)))
+
+    assert output.read_bytes() == b"muxed"
+    assert calls["mux_audio"][3] == 0.0
+    assert calls["mux_audio"][4] == pytest.approx(1 / 12.0)
+
+
+def test_render_video_uses_decoded_frame_count_when_metadata_fps_conflicts_with_duration(monkeypatch, tmp_path):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"fake")
+    output = tmp_path / "pixelated.mp4"
+    frames = [Image.new("RGB", (4, 4), (index % 255, 0, 0)) for index in range(300)]
+    calls = {}
+
+    monkeypatch.setattr(
+        "pixelator.pipeline.probe_video",
+        lambda path: VideoMetadata(width=4, height=4, fps=24.0, duration=5.0),
+    )
+    monkeypatch.setattr("pixelator.pipeline.iter_frames", lambda path: iter(frames))
+
+    def fake_write_video(processed, silent_output, metadata, codec):
+        calls["write_video"] = (list(processed), silent_output, metadata, codec)
+        silent_output.write_bytes(b"video")
+
+    monkeypatch.setattr("pixelator.pipeline.write_video", fake_write_video)
+
+    render_video(
+        source,
+        output,
+        RenderConfig(
+            mode="fast",
+            pixel=PixelConfig(scale=1),
+            effects=EffectsConfig(crt="off", vhs="off"),
+            output=OutputConfig(keep_audio=False, overwrite=True),
+        ),
+    )
+
+    processed, _silent_output, metadata, _codec = calls["write_video"]
+    assert len(processed) == 300
+    assert metadata.fps == pytest.approx(60.0)
+    assert metadata.duration == 5.0
+    assert output.read_bytes() == b"video"
 
 
 def test_render_image_writes_pixelated_png(tmp_path):

@@ -28,6 +28,7 @@ from pixelator.config import CropConfig, TrimConfig
 from pixelator.errors import PixelatorError
 from pixelator.gui.ai_panel import AiAssetsPanel
 from pixelator.gui.ai_worker import AiGenerationWorker
+from pixelator.gui.icons import app_icon
 from pixelator.gui.models import JobQueue, JobStatus, PaletteSnapshot, RenderSettings, VideoJob
 from pixelator.gui.palette_panel import PalettePanel
 from pixelator.gui.preview import PreviewWidget, clamp_crop
@@ -39,6 +40,7 @@ from pixelator.gui.super_resolution_worker import SuperResolutionWorker
 from pixelator.gui.worker import RenderWorker
 from pixelator.image_io import load_static_image
 from pixelator.media import iter_image_files, is_image_path, is_video_path
+from pixelator.style_filters import PALETTE_MODE_FIXED, generate_palette_for_style, style_filter_by_id
 from pixelator.video import extract_frame, probe_video
 
 
@@ -92,7 +94,7 @@ class MainWindow(QMainWindow):
         for spin in (self.crop_width_spin, self.crop_height_spin):
             spin.setRange(1, 1)
             spin.setEnabled(False)
-        self.crop_dimensions_label = QLabel("Output: - x -")
+        self.crop_dimensions_label = QLabel("输出：- x -")
 
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
@@ -102,34 +104,35 @@ class MainWindow(QMainWindow):
         self._connect_signals()
         self._load_ai_assets()
         self._apply_style()
-        self.setWindowTitle("Pixelator Desktop")
+        self.setWindowTitle("Pixelator 桌面版")
+        self.setWindowIcon(app_icon())
         self.setMinimumSize(1280, 720)
-        self.statusBar().showMessage("Ready")
+        self.statusBar().showMessage("就绪")
 
     def _build_layout(self) -> None:
         timeline_row = QHBoxLayout()
-        timeline_row.addWidget(QLabel("Timeline"))
+        timeline_row.addWidget(QLabel("时间线"))
         timeline_row.addWidget(self.scrubber_slider, 1)
-        timeline_row.addWidget(QLabel("Start"))
+        timeline_row.addWidget(QLabel("开始"))
         timeline_row.addWidget(self.trim_start_spin)
-        timeline_row.addWidget(QLabel("End"))
+        timeline_row.addWidget(QLabel("结束"))
         timeline_row.addWidget(self.trim_end_spin)
 
         crop_grid = QGridLayout()
-        crop_grid.addWidget(QLabel("Crop"), 0, 0)
+        crop_grid.addWidget(QLabel("裁剪"), 0, 0)
         crop_grid.addWidget(QLabel("X"), 0, 1)
         crop_grid.addWidget(self.crop_x_spin, 0, 2)
         crop_grid.addWidget(QLabel("Y"), 0, 3)
         crop_grid.addWidget(self.crop_y_spin, 0, 4)
-        crop_grid.addWidget(QLabel("Width"), 1, 1)
+        crop_grid.addWidget(QLabel("宽度"), 1, 1)
         crop_grid.addWidget(self.crop_width_spin, 1, 2)
-        crop_grid.addWidget(QLabel("Height"), 1, 3)
+        crop_grid.addWidget(QLabel("高度"), 1, 3)
         crop_grid.addWidget(self.crop_height_spin, 1, 4)
         crop_grid.addWidget(self.crop_dimensions_label, 1, 5)
         crop_grid.setColumnStretch(5, 1)
 
         preview_layout = QVBoxLayout()
-        preview_layout.addWidget(QLabel("Preview"))
+        preview_layout.addWidget(QLabel("预览"))
         preview_layout.addLayout(timeline_row)
         preview_layout.addWidget(self.preview_widget, 1)
         preview_layout.addLayout(crop_grid)
@@ -142,11 +145,11 @@ class MainWindow(QMainWindow):
         top_splitter.addWidget(preview_widget)
 
         self.right_tabs = QTabWidget()
-        self.right_tabs.addTab(self.settings_panel, "Render")
-        self.right_tabs.addTab(self.palette_panel, "Palette")
-        self.right_tabs.addTab(self.ai_panel, "AI Assets")
-        self.right_tabs.addTab(self.qwen_lab_panel, "Qwen Lab")
-        self.right_tabs.addTab(self.super_resolution_panel, "Super Resolution / 超分")
+        self.right_tabs.addTab(self.settings_panel, "渲染")
+        self.right_tabs.addTab(self.palette_panel, "色盘")
+        self.right_tabs.addTab(self.ai_panel, "AI 资产")
+        self.right_tabs.addTab(self.qwen_lab_panel, "Qwen 实验室")
+        self.right_tabs.addTab(self.super_resolution_panel, "超分")
         top_splitter.addWidget(self.right_tabs)
         top_splitter.setSizes([260, 680, 320])
 
@@ -173,7 +176,7 @@ class MainWindow(QMainWindow):
             if path.is_dir():
                 image_paths = iter_image_files(path)
                 if not image_paths:
-                    self.append_log(f"No supported image files found in {path}")
+                    self.append_log(f"未在 {path} 找到支持的图像文件")
                     continue
                 for image_path in image_paths:
                     self._add_media_path(image_path)
@@ -194,7 +197,7 @@ class MainWindow(QMainWindow):
                     media_type="image",
                 )
                 self.queue.add(job)
-                self.append_log(f"Added image {path.name}")
+                self.append_log(f"已添加图像 {path.name}")
                 return
             if is_video_path(path):
                 metadata = probe_video(path)
@@ -207,11 +210,11 @@ class MainWindow(QMainWindow):
                     media_type="video",
                 )
                 self.queue.add(job)
-                self.append_log(f"Added {path.name}")
+                self.append_log(f"已添加 {path.name}")
                 return
-            self.append_log(f"Unsupported media file: {path}")
+            self.append_log(f"不支持的媒体文件：{path}")
         except PixelatorError as exc:
-            self.append_log(f"Could not add {path}: {exc}")
+            self.append_log(f"无法添加 {path}：{exc}")
 
     def _connect_signals(self) -> None:
         self.queue_panel.add_button.clicked.connect(self._choose_files)
@@ -222,6 +225,8 @@ class MainWindow(QMainWindow):
         self.queue_panel.list_widget.currentItemChanged.connect(self._on_selected_job_changed)
         self.queue_panel.mediaFilesDropped.connect(self.add_media_paths)
         self.settings_panel.settingsChanged.connect(self._on_settings_changed)
+        self.settings_panel.styleFilterChanged.connect(self._on_style_filter_changed)
+        self.settings_panel.paletteGenerationRequested.connect(self._generate_style_palette)
         self.settings_panel.customize_button.clicked.connect(self._customize_selected_job_settings)
         self.settings_panel.use_global_button.clicked.connect(self._use_global_settings_for_selected_job)
         self.palette_panel.paletteChanged.connect(self._on_palette_changed)
@@ -251,20 +256,20 @@ class MainWindow(QMainWindow):
     def _choose_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Add media",
+            "添加媒体",
             "",
             (
-                "Media files (*.mp4 *.mov *.mkv *.avi *.gif *.png *.jpg *.jpeg *.webp *.bmp *.tga *.tif *.tiff);;"
-                "Video and GIF files (*.mp4 *.mov *.mkv *.avi *.gif);;"
-                "Image files (*.png *.jpg *.jpeg *.webp *.bmp *.tga *.tif *.tiff);;"
-                "All files (*.*)"
+                "媒体文件 (*.mp4 *.mov *.mkv *.avi *.gif *.png *.jpg *.jpeg *.webp *.bmp *.tga *.tif *.tiff);;"
+                "视频和 GIF 文件 (*.mp4 *.mov *.mkv *.avi *.gif);;"
+                "图像文件 (*.png *.jpg *.jpeg *.webp *.bmp *.tga *.tif *.tiff);;"
+                "所有文件 (*.*)"
             ),
         )
         if paths:
             self.add_media_paths(paths)
 
     def _choose_folder(self) -> None:
-        selected = QFileDialog.getExistingDirectory(self, "Add image folder", "")
+        selected = QFileDialog.getExistingDirectory(self, "添加图像文件夹", "")
         if selected:
             self.add_media_paths([selected])
 
@@ -284,7 +289,7 @@ class MainWindow(QMainWindow):
         if job is None:
             return
         if job.status == JobStatus.RUNNING:
-            self.append_log("Running jobs will stop after the current render in this version.")
+            self.append_log("当前版本会在本次渲染结束后停止正在运行的任务。")
             return
         self.queue.mark_cancelled(selected)
         self._refresh_queue()
@@ -327,7 +332,7 @@ class MainWindow(QMainWindow):
             self._load_preview_frame(job, preview_seconds, preserve_current_crop=False)
             self.statusBar().showMessage(str(job.source_path))
         except PixelatorError as exc:
-            self.append_log(f"Could not load preview: {exc}")
+            self.append_log(f"无法加载预览：{exc}")
         finally:
             self._loading_job = False
 
@@ -424,15 +429,15 @@ class MainWindow(QMainWindow):
 
     def _extract_palette_from_current_frame(self, count: int, method: str, scope: str) -> None:
         if self._current_preview_frame is None:
-            self.palette_panel.set_status_message("No current frame to extract")
+            self.palette_panel.set_status_message("没有可提取的当前帧")
             return
         frame = self._current_preview_frame
-        source_label = "current frame"
+        source_label = "当前帧"
         if scope == "crop":
             crop = self.preview_widget.crop()
             if crop is not None:
                 frame = frame.crop((crop.x, crop.y, crop.x + crop.width, crop.y + crop.height))
-                source_label = "current crop"
+                source_label = "当前裁剪"
         self.palette_panel.extract_from_image(frame, source_label, count, method)
         self.right_tabs.setCurrentWidget(self.palette_panel)
 
@@ -467,23 +472,23 @@ class MainWindow(QMainWindow):
             spin.setEnabled(enabled)
 
     def _update_crop_dimensions(self, crop: CropConfig) -> None:
-        self.crop_dimensions_label.setText(f"Output: {crop.width} x {crop.height}")
+        self.crop_dimensions_label.setText(f"输出：{crop.width} x {crop.height}")
 
     def _start_queue(self) -> None:
         if self._active_thread is not None:
-            self.append_log("Render already running.")
+            self.append_log("渲染已经在运行。")
             return
         if not any(job.status == JobStatus.QUEUED for job in self.queue.jobs):
             selected = self.queue_panel.selected_job_id()
             if selected and self.queue.requeue_finished(selected) is not None:
-                self.append_log("Requeued selected job.")
+                self.append_log("已重新排队选中的任务。")
                 self._refresh_queue()
         self._run_next_job()
 
     def _run_next_job(self) -> None:
         next_job = next((job for job in self.queue.jobs if job.status == JobStatus.QUEUED), None)
         if next_job is None:
-            self.statusBar().showMessage("Queue complete")
+            self.statusBar().showMessage("队列完成")
             return
 
         settings = self._settings_for_job(next_job)
@@ -549,12 +554,12 @@ class MainWindow(QMainWindow):
 
     def _on_worker_completed(self, job_id: str, output_path: Path) -> None:
         self.queue.mark_completed(job_id, output_path)
-        self.append_log(f"Wrote {output_path}")
+        self.append_log(f"已写入 {output_path}")
         self._refresh_queue()
 
     def _on_worker_failed(self, job_id: str, error: str) -> None:
         self.queue.mark_failed(job_id, error)
-        self.append_log(f"Render failed: {error}")
+        self.append_log(f"渲染失败：{error}")
         self._refresh_queue()
 
     def _on_thread_finished(self) -> None:
@@ -569,7 +574,7 @@ class MainWindow(QMainWindow):
             panel=self.ai_panel,
             prompt=None,
             completed_slot=self._on_ai_generation_completed,
-            failed_prefix="AI generation failed",
+            failed_prefix="AI 生成失败",
         )
 
     def _start_qwen_lab_generation(self, request, prompt, config) -> None:
@@ -579,12 +584,12 @@ class MainWindow(QMainWindow):
             panel=self.qwen_lab_panel,
             prompt=prompt,
             completed_slot=self._on_qwen_lab_generation_completed,
-            failed_prefix="Qwen Lab generation failed",
+            failed_prefix="Qwen 实验室生成失败",
         )
 
     def _start_ai_generation_worker(self, request, config, panel, prompt, completed_slot, failed_prefix: str) -> None:
         if self._ai_thread is not None:
-            self.append_log("AI generation already running.")
+            self.append_log("AI 生成已经在运行。")
             return
         panel.set_generating(True)
         thread = QThread(self)
@@ -605,19 +610,19 @@ class MainWindow(QMainWindow):
 
     def _on_ai_generation_completed(self, records) -> None:
         self.ai_panel.add_asset_records(records)
-        self.ai_panel.set_status_message(f"Saved {len(records)} AI asset(s)")
         if records:
             self._recent_qwen_output_path = records[-1].image_path
-        self.append_log(f"Generated {len(records)} AI asset(s) in {self._ai_output_dir()}")
+        self.ai_panel.set_status_message(f"已保存 {len(records)} 个 AI 资产")
+        self.append_log(f"已在 {self._ai_output_dir()} 生成 {len(records)} 个 AI 资产")
 
     def _on_qwen_lab_generation_completed(self, records) -> None:
         self.qwen_lab_panel.add_asset_records(records)
-        self.qwen_lab_panel.set_status_message(f"Saved and queued {len(records)} AI asset(s)")
+        self.qwen_lab_panel.set_status_message(f"已保存并加入队列 {len(records)} 个 AI 资产")
         paths = [record.image_path for record in records]
         if paths:
             self._recent_qwen_output_path = paths[-1]
             self.add_media_paths(paths)
-        self.append_log(f"Qwen Lab generated and queued {len(records)} AI asset(s) in {self._ai_output_dir()}")
+        self.append_log(f"Qwen 实验室已在 {self._ai_output_dir()} 生成并加入队列 {len(records)} 个 AI 资产")
 
     def _on_ai_generation_failed(self, error: str, panel=None, prefix: str = "AI generation failed") -> None:
         target_panel = panel or self.ai_panel
@@ -634,10 +639,10 @@ class MainWindow(QMainWindow):
     def _add_ai_asset_to_queue(self, path: str) -> None:
         asset_path = Path(path)
         if not asset_path.exists():
-            self.append_log(f"AI asset not found: {asset_path}")
+            self.append_log(f"未找到 AI 资产：{asset_path}")
             return
         self.add_media_paths([asset_path])
-        self.append_log(f"Added AI asset to queue: {asset_path.name}")
+        self.append_log(f"已将 AI 资产加入队列：{asset_path.name}")
 
     def _load_ai_assets(self) -> None:
         records = AssetStore(self._ai_output_dir()).load_records()
@@ -654,7 +659,7 @@ class MainWindow(QMainWindow):
 
     def _start_super_resolution(self, options) -> None:
         if self._super_resolution_thread is not None:
-            self.append_log("Super resolution already running.")
+            self.append_log("超分任务已经在运行。")
             return
         self.super_resolution_panel.set_running(True)
         thread = QThread(self)
@@ -674,11 +679,11 @@ class MainWindow(QMainWindow):
 
     def _on_super_resolution_completed(self, result) -> None:
         self.super_resolution_panel.set_result(result)
-        self.append_log(f"Super resolution wrote {result.output_path}")
+        self.append_log(f"超分已写入 {result.output_path}")
 
     def _on_super_resolution_failed(self, error: str) -> None:
         self.super_resolution_panel.set_error(error)
-        self.append_log(f"Super resolution failed: {error}")
+        self.append_log(f"超分失败：{error}")
 
     def _on_super_resolution_thread_finished(self) -> None:
         self._super_resolution_thread = None
@@ -688,23 +693,23 @@ class MainWindow(QMainWindow):
     def _use_selected_queue_image_for_super_resolution(self) -> None:
         job = self._job_by_id(self.queue_panel.selected_job_id())
         if job is None:
-            self.super_resolution_panel.set_error("Select an image in the queue first.")
+            self.super_resolution_panel.set_error("请先在队列中选择一张图像。")
             return
         if not job.is_image:
-            self.super_resolution_panel.set_error("Super resolution source must be an image queue item.")
+            self.super_resolution_panel.set_error("超分来源必须是队列中的图像。")
             return
         try:
-            self.super_resolution_panel.set_source_path(job.source_path, f"Current queue: {job.source_path}")
+            self.super_resolution_panel.set_source_path(job.source_path, f"当前队列：{job.source_path}")
         except PixelatorError as exc:
             self.super_resolution_panel.set_error(str(exc))
 
     def _use_recent_qwen_output_for_super_resolution(self) -> None:
         path = self._recent_qwen_output_path or self.qwen_lab_panel.latest_asset_path() or self.ai_panel.latest_asset_path()
         if path is None:
-            self.super_resolution_panel.set_error("No recent Qwen output found.")
+            self.super_resolution_panel.set_error("没有找到最近的 Qwen 输出。")
             return
         try:
-            self.super_resolution_panel.set_source_path(path, f"Recent Qwen: {path}")
+            self.super_resolution_panel.set_source_path(path, f"最近 Qwen：{path}")
         except PixelatorError as exc:
             self.super_resolution_panel.set_error(str(exc))
 
@@ -716,24 +721,24 @@ class MainWindow(QMainWindow):
     def _add_super_resolution_output_to_queue(self, path: str) -> None:
         output_path = Path(path)
         if not output_path.exists():
-            self.append_log(f"Super-resolution output not found: {output_path}")
+            self.append_log(f"未找到超分输出：{output_path}")
             return
         self.add_media_paths([output_path])
-        self.append_log(f"Added super-resolution output to queue: {output_path.name}")
+        self.append_log(f"已将超分输出加入队列：{output_path.name}")
 
     def _set_super_resolution_output_as_reference(self, path: str) -> None:
         output_path = Path(path)
         if not output_path.exists():
-            self.append_log(f"Super-resolution output not found: {output_path}")
+            self.append_log(f"未找到超分输出：{output_path}")
             return
         try:
             image = load_static_image(output_path)
         except PixelatorError as exc:
-            self.append_log(f"Could not set reference image: {exc}")
+            self.append_log(f"无法设置参考图像：{exc}")
             return
         self.palette_panel.extract_from_image(image, output_path.name)
         self.right_tabs.setCurrentWidget(self.palette_panel)
-        self.append_log(f"Set super-resolution output as palette reference: {output_path.name}")
+        self.append_log(f"已将超分输出设为色盘参考：{output_path.name}")
 
     def _refresh_queue(self) -> None:
         selected = self.queue_panel.selected_job_id()
@@ -755,6 +760,7 @@ class MainWindow(QMainWindow):
         self._syncing_settings = True
         try:
             self.settings_panel.set_settings(settings)
+            self.settings_panel.set_media_type(job.media_type)
             self.settings_panel.set_settings_scope(customized=job.settings_override is not None)
         finally:
             self._syncing_settings = False
@@ -768,6 +774,32 @@ class MainWindow(QMainWindow):
             self.queue.update(job.id, settings_override=settings)
             return
         self._global_render_settings = settings
+
+    def _on_style_filter_changed(self, style_id: str) -> None:
+        if self._syncing_settings or self._loading_job:
+            return
+        self._generate_style_palette()
+
+    def _generate_style_palette(self) -> None:
+        settings = self.settings_panel.settings()
+        frame = self._current_preview_frame
+        if frame is None and settings.palette_mode != PALETTE_MODE_FIXED:
+            self.palette_panel.set_status_message("没有当前预览帧，已使用固定色盘")
+        generated = generate_palette_for_style(frame, settings.style_filter, settings.palette_mode)
+        self.palette_panel.load_snapshot(
+            PaletteSnapshot(
+                source_colors=generated.source_colors,
+                render_colors=generated.render_colors,
+                auto_match=generated.auto_match,
+                match_sort="hue_brightness",
+            ),
+            emit_changed=True,
+        )
+        style_label = style_filter_by_id(settings.style_filter).label
+        if generated.render_colors:
+            self.palette_panel.set_status_message(f"已生成 {style_label} 色盘：{len(generated.render_colors)} 色")
+        else:
+            self.palette_panel.set_status_message(f"{style_label} 使用自动颜色数量")
 
     def _customize_selected_job_settings(self) -> None:
         job = self._job_by_id(self.queue_panel.selected_job_id())

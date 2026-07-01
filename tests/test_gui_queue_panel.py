@@ -43,4 +43,4 @@ def test_queue_panel_filters_dropped_media_files(tmp_path: Path, qapp):
 
     panel = QueuePanel()
 
-    assert panel._media_files_from_mime_data(mime_data) == [str(image), str(video)]
+    assert panel._media_files_from_mime_data(mime_data) == [str(image), str(video), str(folder)]

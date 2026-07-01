@@ -66,14 +66,23 @@ class VideoJob:
 
 @dataclass(frozen=True)
 class RenderSettings:
+    style_filter: str = "clean_pixel"
+    palette_mode: str = "fixed"
     mode: str = "stable"
     pixel_scale: int = 4
+    target_width: int | None = None
     colors: int = 32
     brightness: float = 1.0
     sharpness: float = 1.2
     saturation: float = 1.1
     crt: str = "off"
     vhs: str = "off"
+    dither: str = "off"
+    dither_ramp: str = "nearest"
+    dither_space: str = "output"
+    dither_strength: float = 0.45
+    dither_scale: int = 4
+    dither_angle: float = 0.0
     keep_audio: bool = True
     overwrite: bool = False
     output_format: str = "mp4"
@@ -100,14 +109,23 @@ class RenderSettings:
             palette = PaletteConfig(strategy="custom", colors=self.colors, custom_colors=self.custom_palette)
         return RenderConfig(
             mode=self.mode,
-            pixel=PixelConfig(scale=self.pixel_scale),
+            pixel=PixelConfig(scale=self.pixel_scale, target_width=self.target_width),
             palette=palette,
             image=ImageConfig(
                 brightness=self.brightness,
                 sharpness=self.sharpness,
                 saturation=self.saturation,
             ),
-            effects=EffectsConfig(crt=self.crt, vhs=self.vhs),
+            effects=EffectsConfig(
+                crt=self.crt,
+                vhs=self.vhs,
+                dither=self.dither,
+                dither_ramp=self.dither_ramp,
+                dither_space=self.dither_space,
+                dither_strength=self.dither_strength,
+                dither_scale=self.dither_scale,
+                dither_angle=self.dither_angle,
+            ),
             output=OutputConfig(keep_audio=self.keep_audio, overwrite=self.overwrite),
             crop=self.crop,
             trim=self.trim,

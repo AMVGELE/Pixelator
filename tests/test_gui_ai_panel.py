@@ -36,11 +36,11 @@ def test_ai_panel_builds_generation_request(qapp):
 def test_ai_panel_exposes_qwen_key_in_provider_settings(qapp):
     panel = AiAssetsPanel()
 
-    assert panel.api_key_edit.placeholderText() == "Uses DASHSCOPE_API_KEY or .env.local when empty"
-    assert panel.save_api_key_button.text() == "Save"
+    assert panel.api_key_edit.placeholderText() == "留空时使用 DASHSCOPE_API_KEY 或 .env.local"
+    assert panel.save_api_key_button.text() == "保存"
     panel.api_key_edit.setText("session-key")
 
-    assert panel.key_source_label.text() == "Using key in field"
+    assert panel.key_source_label.text() == "使用本次粘贴的密钥"
 
 
 def test_ai_panel_saves_qwen_key_for_cli(monkeypatch, tmp_path: Path, qapp):
@@ -55,8 +55,8 @@ def test_ai_panel_saves_qwen_key_for_cli(monkeypatch, tmp_path: Path, qapp):
 
     assert env_file.read_text(encoding="utf-8") == "DASHSCOPE_API_KEY=saved-gui-key\n"
     assert config_value("DASHSCOPE_API_KEY") == "saved-gui-key"
-    assert panel.key_source_label.text() == "Saved to .env.local; CLI uses DASHSCOPE_API_KEY"
-    assert "Saved Qwen API key" in panel.status_label.text()
+    assert panel.key_source_label.text() == "已保存到 .env.local；CLI 使用 DASHSCOPE_API_KEY"
+    assert "已保存 Qwen API key" in panel.status_label.text()
 
 
 def test_ai_panel_preserves_status_when_generation_stops(qapp):
@@ -72,7 +72,7 @@ def test_main_window_has_ai_assets_tab(qapp):
     window = MainWindow()
 
     assert window.right_tabs.count() == 5
-    assert window.right_tabs.tabText(2) == "AI Assets"
+    assert window.right_tabs.tabText(2) == "AI 资产"
     window.close()
 
 
@@ -85,7 +85,8 @@ def test_main_window_adds_generated_asset_records_to_ai_panel(tmp_path: Path, qa
     window._on_ai_generation_completed([record])
 
     assert window.ai_panel.result_list.count() >= 1
-    assert "Generated 1 AI asset" in window.log_view.toPlainText()
+    assert "已在" in window.log_view.toPlainText()
+    assert "生成 1 个 AI 资产" in window.log_view.toPlainText()
     window.close()
 
 

@@ -174,7 +174,7 @@ def mux_audio(
         "copy",
         "-c:a",
         "copy",
-        "-shortest",
+        *(["-shortest"] if duration_seconds is None else []),
         str(output),
     ]
     completed = subprocess.run(

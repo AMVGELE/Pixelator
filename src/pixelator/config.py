@@ -51,6 +51,12 @@ class ImageConfig:
 class EffectsConfig:
     crt: str = "off"
     vhs: str = "off"
+    dither: str = "off"
+    dither_ramp: str = "nearest"
+    dither_space: str = "output"
+    dither_strength: float = 0.45
+    dither_scale: int = 4
+    dither_angle: float = 0.0
     chroma_offset: int = 1
     noise_amount: float = 0.006
 
@@ -186,6 +192,18 @@ def validate_config(config: RenderConfig) -> None:
         raise ConfigError("effects.crt must be 'off' or 'subtle'")
     if config.effects.vhs not in {"off", "light"}:
         raise ConfigError("effects.vhs must be 'off' or 'light'")
+    if config.effects.dither not in {"off", "ordered", "diamond"}:
+        raise ConfigError("effects.dither must be 'off', 'ordered', or 'diamond'")
+    if config.effects.dither_ramp not in {"nearest", "tone"}:
+        raise ConfigError("effects.dither_ramp must be 'nearest' or 'tone'")
+    if config.effects.dither_space not in {"output", "pixel"}:
+        raise ConfigError("effects.dither_space must be 'output' or 'pixel'")
+    if not 0.0 <= config.effects.dither_strength <= 1.0:
+        raise ConfigError("effects.dither_strength must be between 0.0 and 1.0")
+    if not 2 <= config.effects.dither_scale <= 32:
+        raise ConfigError("effects.dither_scale must be between 2 and 32")
+    if not -180.0 <= config.effects.dither_angle <= 180.0:
+        raise ConfigError("effects.dither_angle must be between -180 and 180")
     if config.output.audio_failure not in {"stop", "continue"}:
         raise ConfigError("output.audio_failure must be 'stop' or 'continue'")
 

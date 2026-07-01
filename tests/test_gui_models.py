@@ -98,6 +98,7 @@ def test_render_settings_create_config_with_crop_and_trim():
     settings = RenderSettings(
         mode="fast",
         pixel_scale=8,
+        target_width=1280,
         colors=16,
         keep_audio=False,
         overwrite=True,
@@ -109,6 +110,7 @@ def test_render_settings_create_config_with_crop_and_trim():
 
     assert config.mode == "fast"
     assert config.pixel.scale == 8
+    assert config.pixel.target_width == 1280
     assert config.palette.colors == 16
     assert config.output.keep_audio is False
     assert config.output.overwrite is True
@@ -119,9 +121,35 @@ def test_render_settings_create_config_with_crop_and_trim():
 def test_render_settings_default_output_format_is_mp4():
     settings = RenderSettings()
 
+    assert settings.style_filter == "clean_pixel"
+    assert settings.palette_mode == "fixed"
     assert settings.output_format == "mp4"
+    assert settings.target_width is None
     assert settings.crt == "off"
     assert settings.vhs == "off"
+    assert settings.dither == "off"
+    assert settings.dither_ramp == "nearest"
+    assert settings.dither_space == "output"
+
+
+def test_render_settings_create_config_with_dither_effect():
+    settings = RenderSettings(
+        dither="diamond",
+        dither_ramp="tone",
+        dither_space="pixel",
+        dither_strength=0.65,
+        dither_scale=5,
+        dither_angle=45.0,
+    )
+
+    config = settings.to_config()
+
+    assert config.effects.dither == "diamond"
+    assert config.effects.dither_ramp == "tone"
+    assert config.effects.dither_space == "pixel"
+    assert config.effects.dither_strength == 0.65
+    assert config.effects.dither_scale == 5
+    assert config.effects.dither_angle == 45.0
 
 
 def test_render_settings_create_config_with_custom_palette():

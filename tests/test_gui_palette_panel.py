@@ -116,7 +116,7 @@ def test_palette_panel_snapshot_round_trip(qapp):
     panel.set_source_and_render_colors(["#ff0000", "#0000ff"])
     panel.set_colors(["#1a1c2c", "#f4f4f4"])
     panel.auto_match_check.setChecked(False)
-    panel.sort_combo.setCurrentText("Brightness")
+    panel.sort_combo.setCurrentText("亮度")
 
     snapshot = panel.snapshot()
     target = PalettePanel()
@@ -149,7 +149,7 @@ def test_palette_panel_extracts_from_image_file_with_selected_method(tmp_path, q
     image.save(path)
     panel = PalettePanel()
     panel.extract_count_spin.setValue(3)
-    panel.extract_method_combo.setCurrentText("Shadows / Midtones / Highlights")
+    panel.extract_method_combo.setCurrentText("暗部 / 中间调 / 高光")
 
     panel.extract_from_image_file(path)
 
@@ -161,7 +161,7 @@ def test_palette_panel_palette_mode_signal(qapp):
     modes = []
     panel.paletteModeChanged.connect(modes.append)
 
-    panel.palette_mode_combo.setCurrentText("Per Item Palette")
+    panel.palette_mode_combo.setCurrentText("单项色盘")
 
     assert panel.palette_mode() == "item"
     assert modes == ["item"]
@@ -186,7 +186,7 @@ def test_palette_panel_saves_loads_and_deletes_presets(tmp_path, qapp):
 def test_palette_panel_applies_sort(qapp):
     panel = PalettePanel()
     panel.set_colors(["#ffffff", "#000000", "#808080"])
-    panel.sort_combo.setCurrentText("Brightness")
+    panel.sort_combo.setCurrentText("亮度")
 
     panel.apply_sort()
 
@@ -223,8 +223,7 @@ def test_palette_panel_automatch_uses_perceptual_pairing(qapp):
     panel.select_source_index(1)
 
     assert "#0000ff -> #0000cc" in panel.mapping_view.mapping_label.text()
-    assert "AutoMatch" in panel.mapping_view.mapping_label.text()
-    assert "perceptual distance" in panel.mapping_view.mapping_label.text()
+    assert "自动匹配" in panel.mapping_view.mapping_label.text()
 
 
 def test_palette_panel_add_color_helper_updates_render_palette(qapp):

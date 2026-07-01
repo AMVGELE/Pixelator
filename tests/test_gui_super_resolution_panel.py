@@ -34,7 +34,7 @@ def test_super_resolution_panel_builds_options_from_source(tmp_path: Path, qapp)
     assert options.upscale_factor == 4
     assert options.output_format == "jpg"
     assert options.jpg_quality == 90
-    assert panel.before_size_label.text() == "Before: 4 x 5"
+    assert panel.before_size_label.text() == "原图：4 x 5"
     assert panel.quality_spin.isEnabled()
 
 
@@ -59,7 +59,7 @@ def test_super_resolution_panel_reports_result_and_enables_actions(tmp_path: Pat
         )
     )
 
-    assert panel.status_label.text() == "succeeded"
-    assert panel.after_size_label.text() == "After: 8 x 8"
+    assert panel.status_label.text() == "成功"
+    assert panel.after_size_label.text() == "结果：8 x 8"
     assert panel.add_to_queue_button.isEnabled()
     assert panel.set_reference_button.isEnabled()

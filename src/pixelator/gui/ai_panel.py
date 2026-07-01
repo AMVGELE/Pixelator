@@ -51,7 +51,7 @@ class AiAssetsPanel(QWidget):
         self._settings = QSettings("Pixelator", "Pixelator")
         self._records: list[AiAssetRecord] = []
         self.description_edit = QPlainTextEdit()
-        self.description_edit.setPlaceholderText("Fire slime monster")
+        self.description_edit.setPlaceholderText("火焰史莱姆怪物")
         self.description_edit.setFixedHeight(54)
 
         self.asset_type_combo = self._combo(ASSET_TYPES, ASSET_TYPE_LABELS)
@@ -77,18 +77,18 @@ class AiAssetsPanel(QWidget):
         self.task_endpoint_edit = QLineEdit(config_value("DASHSCOPE_TASK_ENDPOINT", DEFAULT_DASHSCOPE_TASK_ENDPOINT))
         self.api_key_edit = QLineEdit()
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.api_key_edit.setPlaceholderText("Uses DASHSCOPE_API_KEY or .env.local when empty")
-        self.save_api_key_button = QPushButton("Save")
+        self.api_key_edit.setPlaceholderText("留空时使用 DASHSCOPE_API_KEY 或 .env.local")
+        self.save_api_key_button = QPushButton("保存")
         self.key_source_label = QLabel(self._key_source_text())
 
         self.prompt_preview = QPlainTextEdit()
         self.prompt_preview.setReadOnly(True)
         self.prompt_preview.setFixedHeight(108)
 
-        self.generate_button = QPushButton("Generate")
-        self.add_to_queue_button = QPushButton("Add To Queue")
+        self.generate_button = QPushButton("生成")
+        self.add_to_queue_button = QPushButton("加入队列")
         self.add_to_queue_button.setEnabled(False)
-        self.status_label = QLabel("Ready")
+        self.status_label = QLabel("就绪")
         self.result_list = QListWidget()
         self.result_list.setIconSize(QSize(48, 48))
 
@@ -151,40 +151,40 @@ class AiAssetsPanel(QWidget):
 
     def set_generating(self, generating: bool) -> None:
         self.generate_button.setEnabled(not generating)
-        self.generate_button.setText("Generating..." if generating else "Generate")
+        self.generate_button.setText("生成中..." if generating else "生成")
         if generating:
-            self.status_label.setText("Generating")
+            self.status_label.setText("生成中")
 
     def set_status_message(self, message: str) -> None:
         self.status_label.setText(message)
 
     def _build_layout(self) -> None:
-        title = QLabel("AI Asset Generator")
+        title = QLabel("AI 资产生成")
         title.setObjectName("panelTitle")
 
-        provider_group = QGroupBox("Provider Settings")
+        provider_group = QGroupBox("服务设置")
         provider_form = QFormLayout(provider_group)
         provider_form.addRow("Qwen API key", self._api_key_row())
-        provider_form.addRow("Key source", self.key_source_label)
-        provider_form.addRow("Model", self.model_edit)
-        provider_form.addRow("Endpoint", self.endpoint_edit)
-        provider_form.addRow("Task endpoint", self.task_endpoint_edit)
+        provider_form.addRow("密钥来源", self.key_source_label)
+        provider_form.addRow("模型", self.model_edit)
+        provider_form.addRow("接口", self.endpoint_edit)
+        provider_form.addRow("任务接口", self.task_endpoint_edit)
 
         form = QFormLayout()
-        form.addRow("Description", self.description_edit)
-        form.addRow("Asset type", self.asset_type_combo)
-        form.addRow("Style", self.style_combo)
-        form.addRow("Game genre", self.game_genre_combo)
-        form.addRow("View", self.view_combo)
-        form.addRow("Size", self.size_combo)
-        form.addRow("Background", self.background_combo)
-        form.addRow("Count", self.count_spin)
-        form.addRow("Project", self.project_name_edit)
-        form.addRow("Palette", self.palette_edit)
-        form.addRow("Line style", self.line_style_edit)
-        form.addRow("Lighting", self.lighting_edit)
-        form.addRow("View rule", self.view_rule_edit)
-        form.addRow("Avoid", self.avoid_elements_edit)
+        form.addRow("描述", self.description_edit)
+        form.addRow("资产类型", self.asset_type_combo)
+        form.addRow("风格", self.style_combo)
+        form.addRow("游戏类型", self.game_genre_combo)
+        form.addRow("视角", self.view_combo)
+        form.addRow("尺寸", self.size_combo)
+        form.addRow("背景", self.background_combo)
+        form.addRow("数量", self.count_spin)
+        form.addRow("项目", self.project_name_edit)
+        form.addRow("色盘", self.palette_edit)
+        form.addRow("线条风格", self.line_style_edit)
+        form.addRow("光照", self.lighting_edit)
+        form.addRow("视角规则", self.view_rule_edit)
+        form.addRow("避免元素", self.avoid_elements_edit)
         form_widget = QWidget()
         form_widget.setLayout(form)
         form_scroll = QScrollArea()
@@ -200,11 +200,11 @@ class AiAssetsPanel(QWidget):
         layout.addWidget(title)
         layout.addWidget(provider_group)
         layout.addWidget(form_scroll)
-        layout.addWidget(QLabel("Prompt Preview"))
+        layout.addWidget(QLabel("提示词预览"))
         layout.addWidget(self.prompt_preview)
         layout.addLayout(action_row)
         layout.addWidget(self.status_label)
-        layout.addWidget(QLabel("Generated Assets"))
+        layout.addWidget(QLabel("已生成资产"))
         layout.addWidget(self.result_list, 1)
 
     def _connect_signals(self) -> None:
@@ -248,10 +248,10 @@ class AiAssetsPanel(QWidget):
         try:
             env_path = save_local_env_value("DASHSCOPE_API_KEY", self.api_key_edit.text())
         except (OSError, ValueError) as exc:
-            self.set_status_message(f"Could not save Qwen API key: {exc}")
+            self.set_status_message(f"无法保存 Qwen API key：{exc}")
             return
-        self.key_source_label.setText(f"Saved to {env_path.name}; CLI uses DASHSCOPE_API_KEY")
-        self.set_status_message(f"Saved Qwen API key to {env_path}")
+        self.key_source_label.setText(f"已保存到 {env_path.name}；CLI 使用 DASHSCOPE_API_KEY")
+        self.set_status_message(f"已保存 Qwen API key 到 {env_path}")
 
     def _on_add_to_queue_clicked(self) -> None:
         item = self.result_list.currentItem()
@@ -271,7 +271,7 @@ class AiAssetsPanel(QWidget):
             self.prompt_preview.setPlainText(str(exc))
             return
         self.prompt_preview.setPlainText(
-            f"Positive:\n{prompt.positive_prompt}\n\nNegative:\n{prompt.negative_prompt}"
+            f"正向：\n{prompt.positive_prompt}\n\n反向：\n{prompt.negative_prompt}"
         )
 
     def _load_settings(self) -> None:
@@ -312,10 +312,10 @@ class AiAssetsPanel(QWidget):
 
     def _key_source_text(self) -> str:
         if hasattr(self, "api_key_edit") and self.api_key_edit.text().strip():
-            return "Using key in field"
+            return "使用本次粘贴的密钥"
         if config_value("DASHSCOPE_API_KEY"):
-            return "Configured from environment or .env.local"
-        return "Not configured; paste a key above"
+            return "来自环境变量或 .env.local"
+        return "未配置，请在上方粘贴密钥"
 
     def _api_key_row(self) -> QWidget:
         row = QHBoxLayout()

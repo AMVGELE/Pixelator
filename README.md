@@ -14,6 +14,8 @@ python -m pip install -e ".[dev]"
 pixelator input.mp4 --mode fast --out output-fast.mp4
 pixelator input.mp4 --mode stable --out output-stable.mp4
 pixelator input.mp4 --config presets/stable.yaml --out output-stable.mp4
+pixelator input.mp4 --config presets/dark-fantasy-dither.yaml --out output-dark-fantasy.mp4
+pixelator input.mp4 --config presets/cold-sci-fi-dither.yaml --out output-cold-sci-fi.mp4
 pixelator input.gif --mode fast --out output-from-gif.mp4
 pixelator input.mp4 --mode fast --out output.gif --no-audio
 pixelator texture.png --mode fast --out texture-pixelated.png
@@ -149,8 +151,9 @@ folder are ignored.
 
 Render settings are shared by default across the queue. Select a queued item and
 use `Customize This Item` when one resource needs its own pixel scale, color
-count, image adjustment, effects, or output format. `Use Global` returns that
-item to the shared default settings. Crop and trim remain per item.
+count, high-resolution target width, image adjustment, effects, or output format.
+`Use Global` returns that item to the shared default settings. Crop and trim
+remain per item.
 
 The right side of the GUI is split into Render and Palette tabs. Render keeps the
 automatic `Colors` count and output controls; Palette provides a Source -> Render
@@ -223,9 +226,37 @@ widths or heights are snapped to even output dimensions for H.264 compatibility.
 Image jobs do not use the timeline and keep exact crop dimensions, including odd
 texture sizes.
 
-CRT and VHS are optional style effects. The default render is clean pixel art.
-VHS light uses low-frequency luminance variation instead of per-pixel color
-noise, so it should not shatter solid pixel blocks.
+The Chinese Render tab exposes `高清输出` for the existing `pixel.target_width`
+setting. When enabled, `目标宽度` sets the intermediate pixel-art width before the
+nearest-neighbor upscale back to the final output size. When disabled, Pixelator
+uses the normal `像素尺度` setting.
+
+CRT, VHS, and ordered dithering are optional style effects. The default render
+is clean pixel art. VHS light uses low-frequency luminance variation instead of
+per-pixel color noise, so it should not shatter solid pixel blocks.
+
+The desktop GUI is localized in Chinese and includes a `风格滤镜` selector. The
+built-in dither filters include `暗黑幻想抖动`, `冷色科幻抖动`, `琥珀废墟抖动`,
+`蓝黑夜景抖动`, and `低饱和灰绿抖动`. Each filter fills in pixel scale, image
+adjustment, dither settings, and a default palette. `调色盘模式` can use the fixed
+palette, generate an automatic unified palette from the current preview frame,
+or generate an automatic palette that preserves saturated red, blue, and white
+lights.
+
+The matching CLI presets are:
+
+```bash
+pixelator input.mp4 --config presets/dark-fantasy-dither.yaml --out output-dark-fantasy.mp4
+pixelator input.mp4 --config presets/cold-sci-fi-dither.yaml --out output-cold-sci-fi.mp4
+pixelator input.mp4 --config presets/amber-ruin-dither.yaml --out output-amber-ruin.mp4
+pixelator input.mp4 --config presets/noir-blue-dither.yaml --out output-noir-blue.mp4
+pixelator input.mp4 --config presets/muted-green-dither.yaml --out output-muted-green.mp4
+```
+
+These presets enable ordered tone-ramp dithering for dark, low-color scenes with
+textured tone transitions. Their dither runs in pixel space, so increasing pixel
+scale keeps the ordered dot structure tied to the enlarged pixel grid instead of
+adding a separate output-resolution texture.
 
 ## Windows Portable Package
 

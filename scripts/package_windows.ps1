@@ -42,12 +42,15 @@ $WorkPath = Resolve-InProject (Join-Path $ProjectRootPath "build\pyinstaller")
 $SpecPath = Resolve-InProject (Join-Path $ProjectRootPath "build\spec")
 $SourcePath = Resolve-InProject (Join-Path $ProjectRootPath "src")
 $PresetsPath = Resolve-InProject (Join-Path $ProjectRootPath "presets")
+$GuiAssetsPath = Resolve-InProject (Join-Path $ProjectRootPath "src\pixelator\gui\assets")
+$IconPath = Resolve-InProject (Join-Path $GuiAssetsPath "pixelator_icon.ico")
 
 & $PythonExe -m PyInstaller `
     --noconfirm `
     --clean `
     --windowed `
     --name Pixelator `
+    --icon $IconPath `
     --distpath $DistDir `
     --workpath $WorkPath `
     --specpath $SpecPath `
@@ -55,6 +58,7 @@ $PresetsPath = Resolve-InProject (Join-Path $ProjectRootPath "presets")
     --collect-all PySide6 `
     --collect-all imageio_ffmpeg `
     --add-data "$PresetsPath;presets" `
+    --add-data "$GuiAssetsPath;pixelator/gui/assets" `
     $EntryScript
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE"

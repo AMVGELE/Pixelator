@@ -8,8 +8,9 @@ from PIL import Image
 from PySide6.QtWidgets import QApplication
 
 from pixelator.config import CropConfig
-from pixelator.gui.models import VideoJob
+from pixelator.gui.icons import app_icon_path
 from pixelator.gui.main_window import MainWindow
+from pixelator.gui.models import VideoJob
 from pixelator.ai.super_resolution import SuperResolutionResult
 from pixelator.video import VideoMetadata
 
@@ -18,6 +19,14 @@ from pixelator.video import VideoMetadata
 def qapp():
     app = QApplication.instance() or QApplication([])
     yield app
+
+
+def test_main_window_uses_app_icon(qapp):
+    window = MainWindow()
+
+    assert app_icon_path().exists()
+    assert not window.windowIcon().isNull()
+    window.close()
 
 
 def test_scrubber_refreshes_preview_frame(monkeypatch, tmp_path: Path, qapp):
@@ -113,7 +122,7 @@ def test_numeric_crop_controls_update_job_crop(monkeypatch, tmp_path: Path, qapp
     window.crop_height_spin.setValue(18)
 
     assert window.queue.jobs[0].crop == CropConfig(x=10, y=4, width=24, height=18)
-    assert window.crop_dimensions_label.text() == "Output: 24 x 18"
+    assert window.crop_dimensions_label.text() == "输出：24 x 18"
     window.close()
 
 
@@ -136,7 +145,7 @@ def test_numeric_crop_controls_snap_to_even_output_dimensions(monkeypatch, tmp_p
     window.crop_height_spin.setValue(19)
 
     assert window.queue.jobs[0].crop == CropConfig(x=0, y=0, width=24, height=18)
-    assert window.crop_dimensions_label.text() == "Output: 24 x 18"
+    assert window.crop_dimensions_label.text() == "输出：24 x 18"
     window.close()
 
 
@@ -164,7 +173,7 @@ def test_crop_drag_update_does_not_reload_preview(monkeypatch, tmp_path: Path, q
 
     assert requested_seconds == [0.0]
     assert window.queue.jobs[0].crop == CropConfig(x=4, y=6, width=24, height=18)
-    assert window.crop_dimensions_label.text() == "Output: 24 x 18"
+    assert window.crop_dimensions_label.text() == "输出：24 x 18"
     window.close()
 
 
@@ -224,6 +233,8 @@ def test_add_image_path_loads_preview_and_disables_timeline(tmp_path: Path, qapp
     assert not window.trim_start_spin.isEnabled()
     assert not window.trim_end_spin.isEnabled()
     assert not window.scrubber_slider.isEnabled()
+    assert not window.settings_panel.output_format_combo.isEnabled()
+    assert not window.settings_panel.keep_audio_check.isEnabled()
     window.close()
 
 
@@ -249,7 +260,7 @@ def test_super_resolution_uses_selected_queue_image(tmp_path: Path, qapp):
     window._use_selected_queue_image_for_super_resolution()
 
     assert window.super_resolution_panel.options().source_path == source
-    assert window.super_resolution_panel.before_size_label.text() == "Before: 6 x 4"
+    assert window.super_resolution_panel.before_size_label.text() == "原图：6 x 4"
     window.close()
 
 
@@ -276,7 +287,7 @@ def test_main_window_adds_super_resolution_output_to_queue_and_reference(tmp_pat
     window._add_super_resolution_output_to_queue(str(output))
     window._set_super_resolution_output_as_reference(str(output))
 
-    assert window.super_resolution_panel.status_label.text() == "succeeded"
+    assert window.super_resolution_panel.status_label.text() == "成功"
     assert window.queue.jobs[0].source_path == output
     assert window.palette_panel.source_colors()
     assert window.right_tabs.currentWidget() is window.palette_panel
@@ -402,7 +413,7 @@ def test_per_item_palette_snapshot_does_not_pollute_shared_palette(tmp_path: Pat
     window.add_media_paths([first, second])
     window.palette_panel.set_source_and_render_colors(["#000000", "#ffffff"])
 
-    window.palette_panel.palette_mode_combo.setCurrentText("Per Item Palette")
+    window.palette_panel.palette_mode_combo.setCurrentText("单项色盘")
     window.palette_panel.set_colors(["#ff0000", "#00ff00"])
     window.queue_panel.list_widget.setCurrentRow(1)
 
@@ -442,7 +453,7 @@ def test_image_crop_controls_preserve_odd_dimensions(tmp_path: Path, qapp):
     window.crop_height_spin.setValue(3)
 
     assert window.queue.jobs[0].crop == CropConfig(x=0, y=0, width=3, height=3)
-    assert window.crop_dimensions_label.text() == "Output: 3 x 3"
+    assert window.crop_dimensions_label.text() == "输出：3 x 3"
     window.close()
 
 
@@ -450,11 +461,11 @@ def test_right_side_splits_render_and_palette_tabs(qapp):
     window = MainWindow()
 
     assert window.right_tabs.count() == 5
-    assert window.right_tabs.tabText(0) == "Render"
-    assert window.right_tabs.tabText(1) == "Palette"
-    assert window.right_tabs.tabText(2) == "AI Assets"
-    assert window.right_tabs.tabText(3) == "Qwen Lab"
-    assert window.right_tabs.tabText(4) == "Super Resolution / 超分"
+    assert window.right_tabs.tabText(0) == "渲染"
+    assert window.right_tabs.tabText(1) == "色盘"
+    assert window.right_tabs.tabText(2) == "AI 资产"
+    assert window.right_tabs.tabText(3) == "Qwen 实验室"
+    assert window.right_tabs.tabText(4) == "超分"
     window.close()
 
 
@@ -476,7 +487,7 @@ def test_main_window_original_colors_ignores_palette_panel(tmp_path: Path, qapp)
     job = VideoJob(source_path=source, media_type="image")
     window = MainWindow()
     window.palette_panel.set_source_and_render_colors(["#000000", "#ffcc00"])
-    window.settings_panel.palette_strategy_combo.setCurrentText("Original Colors")
+    window.settings_panel.palette_strategy_combo.setCurrentText("原始颜色")
 
     settings = window._settings_for_job(job)
 
@@ -516,5 +527,46 @@ def test_main_window_current_frame_extract_without_preview_does_not_change_palet
     window._extract_palette_from_current_frame(2, "dominant", "full")
 
     assert window.palette_panel.colors() == []
-    assert window.palette_panel.status_label.text() == "No current frame to extract"
+    assert window.palette_panel.status_label.text() == "没有可提取的当前帧"
+    window.close()
+
+
+def test_main_window_generates_style_palette_from_current_preview(tmp_path: Path, qapp):
+    source = tmp_path / "lights.png"
+    image = Image.new("RGB", (6, 1))
+    image.putdata([(8, 8, 10), (30, 36, 42), (60, 70, 80), (230, 30, 20), (20, 70, 240), (240, 240, 250)])
+    image.save(source)
+
+    window = MainWindow()
+    window.add_media_paths([source])
+    window.settings_panel.style_filter_combo.setCurrentText("暗黑幻想抖动")
+    window.settings_panel.palette_mode_combo.setCurrentText("自动保留灯色")
+    window._generate_style_palette()
+
+    settings = window._settings_for_job(window.queue.jobs[0])
+    assert settings.style_filter == "dark_fantasy_dither"
+    assert settings.palette_strategy == "custom"
+    assert settings.custom_palette is not None
+    assert len(settings.custom_palette) == 7
+    assert settings.source_palette is None
+    assert window.palette_panel.auto_match_check.isChecked() is False
+    window.close()
+
+
+def test_main_window_regenerates_style_palette_when_palette_mode_changes(tmp_path: Path, qapp):
+    source = tmp_path / "lights.png"
+    image = Image.new("RGB", (6, 1))
+    image.putdata([(8, 8, 10), (30, 36, 42), (60, 70, 80), (230, 30, 20), (20, 70, 240), (240, 240, 250)])
+    image.save(source)
+
+    window = MainWindow()
+    window.add_media_paths([source])
+    window.settings_panel.style_filter_combo.setCurrentText("暗黑幻想抖动")
+    fixed_colors = window.palette_panel.colors()
+
+    window.settings_panel.palette_mode_combo.setCurrentText("自动保留灯色")
+
+    regenerated_colors = window.palette_panel.colors()
+    assert regenerated_colors != fixed_colors
+    assert len(regenerated_colors) == 7
     window.close()

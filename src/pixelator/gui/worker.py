@@ -25,7 +25,7 @@ class RenderWorker(QObject):
     def run(self) -> None:
         try:
             self.progressChanged.emit(self.job.id, 0)
-            self.logMessage.emit(f"Rendering {self.job.source_path.name}")
+            self.logMessage.emit(f"正在渲染 {self.job.source_path.name}")
             output = render_media(self.job.source_path, self.output_path, self.settings.to_config())
             self.progressChanged.emit(self.job.id, 100)
             self.jobCompleted.emit(self.job.id, output)

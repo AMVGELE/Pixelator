@@ -47,10 +47,10 @@ class QwenLabPanel(QWidget):
         self._settings = QSettings("Pixelator", "Pixelator")
         self._records: list[AiAssetRecord] = []
         self.description_edit = QPlainTextEdit()
-        self.description_edit.setPlaceholderText("Clockwork owl familiar")
+        self.description_edit.setPlaceholderText("机械猫头鹰使魔")
         self.description_edit.setFixedHeight(54)
         self.keywords_edit = QLineEdit()
-        self.keywords_edit.setPlaceholderText("extra materials, silhouette, camera rules")
+        self.keywords_edit.setPlaceholderText("额外材质、轮廓、镜头规则")
 
         self.asset_type_combo = self._combo(ASSET_TYPES, ASSET_TYPE_LABELS)
         self.style_combo = self._combo(ART_STYLES, ART_STYLE_LABELS)
@@ -61,7 +61,7 @@ class QwenLabPanel(QWidget):
         self.positive_prompt_edit.setFixedHeight(118)
         self.negative_prompt_edit = QPlainTextEdit()
         self.negative_prompt_edit.setFixedHeight(82)
-        self.rebuild_prompt_button = QPushButton("Rebuild Prompt")
+        self.rebuild_prompt_button = QPushButton("重建提示词")
 
         self.width_spin = QSpinBox()
         self.height_spin = QSpinBox()
@@ -73,20 +73,20 @@ class QwenLabPanel(QWidget):
         self.count_spin.setRange(1, 6)
         self.count_spin.setValue(1)
         self.background_combo = QComboBox()
-        self.background_combo.addItem("Keep background", "scene")
-        self.background_combo.addItem("Transparent cutout", "transparent")
+        self.background_combo.addItem("保留背景", "scene")
+        self.background_combo.addItem("透明抠图", "transparent")
 
         self.model_edit = QLineEdit(config_value("IMAGE_MODEL", DEFAULT_IMAGE_MODEL))
         self.endpoint_edit = QLineEdit(config_value("DASHSCOPE_IMAGE_ENDPOINT", DEFAULT_DASHSCOPE_IMAGE_ENDPOINT))
         self.task_endpoint_edit = QLineEdit(config_value("DASHSCOPE_TASK_ENDPOINT", DEFAULT_DASHSCOPE_TASK_ENDPOINT))
         self.api_key_edit = QLineEdit()
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.api_key_edit.setPlaceholderText("Uses DASHSCOPE_API_KEY or .env.local when empty")
-        self.save_api_key_button = QPushButton("Save")
+        self.api_key_edit.setPlaceholderText("留空时使用 DASHSCOPE_API_KEY 或 .env.local")
+        self.save_api_key_button = QPushButton("保存")
         self.key_source_label = QLabel(self._key_source_text())
 
-        self.generate_button = QPushButton("Generate And Add")
-        self.status_label = QLabel("Ready")
+        self.generate_button = QPushButton("生成并加入队列")
+        self.status_label = QLabel("就绪")
         self.result_list = QListWidget()
         self.result_list.setIconSize(QSize(48, 48))
 
@@ -98,14 +98,14 @@ class QwenLabPanel(QWidget):
     def generation_request(self) -> tuple[AiGenerationRequest, PromptResult]:
         description = self._description()
         if len(description) < 2:
-            raise ValueError("Description must be at least 2 characters.")
+            raise ValueError("描述至少需要 2 个字符。")
         self._validate_pixel_budget()
         prompt = PromptResult(
             positive_prompt=self._clean_multiline(self.positive_prompt_edit.toPlainText()),
             negative_prompt=self._clean_multiline(self.negative_prompt_edit.toPlainText()),
         )
         if not prompt.positive_prompt:
-            raise ValueError("Positive prompt is required.")
+            raise ValueError("正向提示词不能为空。")
         request = AiGenerationRequest(
             description=description,
             asset_type=str(self.asset_type_combo.currentData()),
@@ -151,33 +151,33 @@ class QwenLabPanel(QWidget):
 
     def set_generating(self, generating: bool) -> None:
         self.generate_button.setEnabled(not generating)
-        self.generate_button.setText("Generating..." if generating else "Generate And Add")
+        self.generate_button.setText("生成中..." if generating else "生成并加入队列")
         if generating:
-            self.status_label.setText("Generating")
+            self.status_label.setText("生成中")
 
     def set_status_message(self, message: str) -> None:
         self.status_label.setText(message)
 
     def _build_layout(self) -> None:
-        title = QLabel("Qwen Lab")
+        title = QLabel("Qwen 实验室")
         title.setObjectName("panelTitle")
 
-        builder_group = QGroupBox("Prompt Builder")
+        builder_group = QGroupBox("提示词构建")
         builder_form = QFormLayout(builder_group)
-        builder_form.addRow("Description", self.description_edit)
-        builder_form.addRow("Keywords", self.keywords_edit)
-        builder_form.addRow("Asset type", self.asset_type_combo)
-        builder_form.addRow("Style", self.style_combo)
-        builder_form.addRow("Genre", self.game_genre_combo)
-        builder_form.addRow("View", self.view_combo)
+        builder_form.addRow("描述", self.description_edit)
+        builder_form.addRow("关键词", self.keywords_edit)
+        builder_form.addRow("资产类型", self.asset_type_combo)
+        builder_form.addRow("风格", self.style_combo)
+        builder_form.addRow("游戏类型", self.game_genre_combo)
+        builder_form.addRow("视角", self.view_combo)
         builder_form.addRow("", self.rebuild_prompt_button)
 
-        editor_group = QGroupBox("Prompt Editor")
+        editor_group = QGroupBox("提示词编辑")
         editor_form = QFormLayout(editor_group)
-        editor_form.addRow("Positive", self.positive_prompt_edit)
-        editor_form.addRow("Negative", self.negative_prompt_edit)
+        editor_form.addRow("正向", self.positive_prompt_edit)
+        editor_form.addRow("反向", self.negative_prompt_edit)
 
-        generation_group = QGroupBox("Generation")
+        generation_group = QGroupBox("生成")
         generation_form = QFormLayout(generation_group)
         size_row = QHBoxLayout()
         size_row.addWidget(self.width_spin)
@@ -185,14 +185,14 @@ class QwenLabPanel(QWidget):
         size_row.addWidget(self.height_spin)
         size_widget = QWidget()
         size_widget.setLayout(size_row)
-        generation_form.addRow("Size", size_widget)
-        generation_form.addRow("Count", self.count_spin)
-        generation_form.addRow("Background", self.background_combo)
+        generation_form.addRow("尺寸", size_widget)
+        generation_form.addRow("数量", self.count_spin)
+        generation_form.addRow("背景", self.background_combo)
         generation_form.addRow("Qwen API key", self._api_key_row())
-        generation_form.addRow("Key source", self.key_source_label)
-        generation_form.addRow("Model", self.model_edit)
-        generation_form.addRow("Endpoint", self.endpoint_edit)
-        generation_form.addRow("Task endpoint", self.task_endpoint_edit)
+        generation_form.addRow("密钥来源", self.key_source_label)
+        generation_form.addRow("模型", self.model_edit)
+        generation_form.addRow("接口", self.endpoint_edit)
+        generation_form.addRow("任务接口", self.task_endpoint_edit)
 
         content = QWidget()
         content_layout = QVBoxLayout(content)
@@ -209,7 +209,7 @@ class QwenLabPanel(QWidget):
         layout.addWidget(scroll)
         layout.addWidget(self.generate_button)
         layout.addWidget(self.status_label)
-        layout.addWidget(QLabel("Recent Outputs"))
+        layout.addWidget(QLabel("已生成结果"))
         layout.addWidget(self.result_list, 1)
 
     def _connect_signals(self) -> None:
@@ -235,10 +235,10 @@ class QwenLabPanel(QWidget):
         try:
             env_path = save_local_env_value("DASHSCOPE_API_KEY", self.api_key_edit.text())
         except (OSError, ValueError) as exc:
-            self.set_status_message(f"Could not save Qwen API key: {exc}")
+            self.set_status_message(f"无法保存 Qwen API key：{exc}")
             return
-        self.key_source_label.setText(f"Saved to {env_path.name}; CLI uses DASHSCOPE_API_KEY")
-        self.set_status_message(f"Saved Qwen API key to {env_path}")
+        self.key_source_label.setText(f"已保存到 {env_path.name}；CLI 使用 DASHSCOPE_API_KEY")
+        self.set_status_message(f"已保存 Qwen API key 到 {env_path}")
 
     def _refresh_prompt_editor(self) -> None:
         if len(self._description()) < 2:
@@ -272,7 +272,7 @@ class QwenLabPanel(QWidget):
     def _validate_pixel_budget(self) -> None:
         pixels = self.width_spin.value() * self.height_spin.value()
         if pixels < 512 * 512 or pixels > 2048 * 2048:
-            raise ValueError("Qwen Lab size must be between 512x512 and 2048x2048 total pixels.")
+            raise ValueError("Qwen 实验室尺寸总像素必须介于 512x512 和 2048x2048 之间。")
 
     def _load_settings(self) -> None:
         self._set_combo_value(self.asset_type_combo, self._settings.value("qwen_lab/asset_type", "character"))
@@ -307,10 +307,10 @@ class QwenLabPanel(QWidget):
 
     def _key_source_text(self) -> str:
         if hasattr(self, "api_key_edit") and self.api_key_edit.text().strip():
-            return "Using key in field"
+            return "使用本次粘贴的密钥"
         if config_value("DASHSCOPE_API_KEY"):
-            return "Configured from environment or .env.local"
-        return "Not configured; paste a key above"
+            return "来自环境变量或 .env.local"
+        return "未配置，请在上方粘贴密钥"
 
     def _api_key_row(self) -> QWidget:
         row = QHBoxLayout()

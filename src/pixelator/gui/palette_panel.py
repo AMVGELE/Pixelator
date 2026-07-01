@@ -59,47 +59,47 @@ class PalettePanel(QWidget):
         self._syncing_palette_mode = False
 
         self.palette_mode_combo = QComboBox()
-        self.palette_mode_combo.addItem("Shared Palette", "shared")
-        self.palette_mode_combo.addItem("Per Item Palette", "item")
+        self.palette_mode_combo.addItem("共享色盘", "shared")
+        self.palette_mode_combo.addItem("单项色盘", "item")
 
         self.extract_count_spin = QSpinBox()
         self.extract_count_spin.setRange(2, 256)
         self.extract_count_spin.setValue(32)
         self.extract_method_combo = QComboBox()
-        self.extract_method_combo.addItem("Dominant Colors", "dominant")
-        self.extract_method_combo.addItem("Balanced Hue", "balanced_hue")
-        self.extract_method_combo.addItem("Shadows / Midtones / Highlights", "tonal")
+        self.extract_method_combo.addItem("主色", "dominant")
+        self.extract_method_combo.addItem("均衡色相", "balanced_hue")
+        self.extract_method_combo.addItem("暗部 / 中间调 / 高光", "tonal")
         self.extract_scope_combo = QComboBox()
-        self.extract_scope_combo.addItem("Full Frame", "full")
-        self.extract_scope_combo.addItem("Current Crop", "crop")
-        self.extract_current_frame_button = QPushButton("Current Frame")
-        self.extract_image_button = QPushButton("Image...")
+        self.extract_scope_combo.addItem("全画面", "full")
+        self.extract_scope_combo.addItem("当前裁剪", "crop")
+        self.extract_current_frame_button = QPushButton("当前帧")
+        self.extract_image_button = QPushButton("图像...")
 
         self.preset_name_edit = QLineEdit()
-        self.preset_name_edit.setPlaceholderText("Preset name")
+        self.preset_name_edit.setPlaceholderText("预设名称")
         self.preset_combo = QComboBox()
-        self.save_preset_button = QPushButton("Save")
-        self.load_preset_button = QPushButton("Load")
-        self.delete_preset_button = QPushButton("Delete")
+        self.save_preset_button = QPushButton("保存")
+        self.load_preset_button = QPushButton("加载")
+        self.delete_preset_button = QPushButton("删除")
 
-        self.add_button = QPushButton("Add")
-        self.delete_button = QPushButton("Delete")
-        self.replace_button = QPushButton("Replace")
-        self.up_button = QPushButton("Up")
-        self.down_button = QPushButton("Down")
-        self.load_button = QPushButton("Load YAML")
-        self.save_button = QPushButton("Save YAML")
-        self.import_lospec_button = QPushButton("Import Lospec")
+        self.add_button = QPushButton("添加")
+        self.delete_button = QPushButton("删除")
+        self.replace_button = QPushButton("替换")
+        self.up_button = QPushButton("上移")
+        self.down_button = QPushButton("下移")
+        self.load_button = QPushButton("加载 YAML")
+        self.save_button = QPushButton("保存 YAML")
+        self.import_lospec_button = QPushButton("导入 Lospec")
 
         self.sort_combo = QComboBox()
-        self.sort_combo.addItem("Hue + Brightness", "hue_brightness")
-        self.sort_combo.addItem("Original", "original")
-        self.sort_combo.addItem("Brightness", "brightness")
-        self.sort_combo.addItem("Hue", "hue")
-        self.sort_combo.addItem("Saturation", "saturation")
-        self.auto_match_check = QCheckBox("AutoMatch")
+        self.sort_combo.addItem("色相 + 亮度", "hue_brightness")
+        self.sort_combo.addItem("原始顺序", "original")
+        self.sort_combo.addItem("亮度", "brightness")
+        self.sort_combo.addItem("色相", "hue")
+        self.sort_combo.addItem("饱和度", "saturation")
+        self.auto_match_check = QCheckBox("自动匹配")
         self.auto_match_check.setChecked(True)
-        self.apply_sort_button = QPushButton("Sort")
+        self.apply_sort_button = QPushButton("排序")
 
         self.match_board = ColorMatchBoard()
         self.mapping_view = ColorMappingView()
@@ -107,7 +107,7 @@ class PalettePanel(QWidget):
 
         self.hex_edit = QLineEdit("#000000")
         self.hex_edit.setMaxLength(7)
-        self.status_label = QLabel("Automatic palette")
+        self.status_label = QLabel("自动色盘")
 
         self._build_layout()
         self._connect_signals()
@@ -285,7 +285,7 @@ class PalettePanel(QWidget):
             self._set_status(str(exc))
             return
         self.set_colors(loaded.colors)
-        self._set_status(f"Loaded {palette_path.name}")
+        self._set_status(f"已加载 {palette_path.name}")
 
     def save_palette(self, path: str | Path | None = None) -> None:
         palette_path = Path(path) if path is not None else self._choose_save_path()
@@ -296,7 +296,7 @@ class PalettePanel(QWidget):
         except ConfigError as exc:
             self._set_status(str(exc))
             return
-        self._set_status(f"Saved {palette_path.name}")
+        self._set_status(f"已保存 {palette_path.name}")
 
     def extract_from_image(
         self,
@@ -315,7 +315,7 @@ class PalettePanel(QWidget):
             self._set_status(str(exc))
             return
         self.set_source_colors(colors)
-        self._set_status(f"Extracted {len(colors)} colors from {source_label}")
+        self._set_status(f"已从{source_label}提取 {len(colors)} 个颜色")
 
     def extract_from_image_file(self, path: str | Path | None = None) -> None:
         image_path = Path(path) if path is not None else self._choose_image_path()
@@ -326,7 +326,7 @@ class PalettePanel(QWidget):
                 image.seek(0)
                 self.extract_from_image(image.copy(), image_path.name)
         except (OSError, ConfigError) as exc:
-            self._set_status(f"Could not extract palette: {exc}")
+            self._set_status(f"无法提取色盘：{exc}")
 
     def import_lospec_palette(self, path: str | Path | None = None) -> None:
         palette_path = Path(path) if path is not None else self._choose_lospec_path()
@@ -338,7 +338,7 @@ class PalettePanel(QWidget):
             self._set_status(str(exc))
             return
         self.set_source_and_render_colors(colors)
-        self._set_status(f"Imported {palette_path.name}")
+        self._set_status(f"已导入 {palette_path.name}")
 
     def save_preset(self, name: str | None = None) -> None:
         preset_name = (name if name is not None else self.preset_name_edit.text()).strip()
@@ -348,7 +348,7 @@ class PalettePanel(QWidget):
             self._set_status(str(exc))
             return
         self._refresh_presets(select_path=path)
-        self._set_status(f"Saved preset {preset_name}")
+        self._set_status(f"已保存预设 {preset_name}")
 
     def load_selected_preset(self) -> None:
         path = self._selected_preset_path()
@@ -362,7 +362,7 @@ class PalettePanel(QWidget):
         self.set_colors(loaded.colors)
         if loaded.name:
             self.preset_name_edit.setText(loaded.name)
-        self._set_status(f"Loaded preset {loaded.name or path.stem}")
+        self._set_status(f"已加载预设 {loaded.name or path.stem}")
 
     def delete_selected_preset(self, confirm: bool = True) -> None:
         path = self._selected_preset_path()
@@ -372,8 +372,8 @@ class PalettePanel(QWidget):
         if confirm:
             result = QMessageBox.question(
                 self,
-                "Delete preset",
-                f"Delete palette preset '{name}'?",
+                "删除预设",
+                f"删除色盘预设“{name}”？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -385,7 +385,7 @@ class PalettePanel(QWidget):
             self._set_status(str(exc))
             return
         self._refresh_presets()
-        self._set_status(f"Deleted preset {name}")
+        self._set_status(f"已删除预设 {name}")
 
     def apply_sort(self) -> None:
         try:
@@ -393,26 +393,26 @@ class PalettePanel(QWidget):
         except ConfigError as exc:
             self._set_status(str(exc))
             return
-        self._set_status(f"Sorted by {self.sort_combo.currentText().lower()}")
+        self._set_status(f"已按{self.sort_combo.currentText()}排序")
 
     def set_status_message(self, message: str) -> None:
         self._set_status(message)
 
     def _build_layout(self) -> None:
-        title = QLabel("Palette")
+        title = QLabel("色盘")
         title.setObjectName("panelTitle")
 
         tool_row = QGridLayout()
-        tool_row.addWidget(QLabel("Palette"), 0, 0)
+        tool_row.addWidget(QLabel("色盘"), 0, 0)
         tool_row.addWidget(self.palette_mode_combo, 0, 1, 1, 3)
-        tool_row.addWidget(QLabel("Extract"), 1, 0)
+        tool_row.addWidget(QLabel("提取"), 1, 0)
         tool_row.addWidget(self.extract_count_spin, 1, 1)
         tool_row.addWidget(self.extract_current_frame_button, 1, 2)
         tool_row.addWidget(self.extract_image_button, 1, 3)
-        tool_row.addWidget(QLabel("Method"), 2, 0)
+        tool_row.addWidget(QLabel("方法"), 2, 0)
         tool_row.addWidget(self.extract_method_combo, 2, 1, 1, 2)
         tool_row.addWidget(self.extract_scope_combo, 2, 3)
-        tool_row.addWidget(QLabel("Preset"), 3, 0)
+        tool_row.addWidget(QLabel("预设"), 3, 0)
         tool_row.addWidget(self.preset_combo, 3, 1, 1, 2)
         tool_row.addWidget(self.load_preset_button, 3, 3)
         tool_row.addWidget(self.preset_name_edit, 4, 0, 1, 2)
@@ -422,7 +422,7 @@ class PalettePanel(QWidget):
         tool_row.addWidget(self.save_button, 5, 1)
         tool_row.addWidget(self.import_lospec_button, 5, 2)
         tool_row.addWidget(self.apply_sort_button, 5, 3)
-        tool_row.addWidget(QLabel("Sort"), 6, 0)
+        tool_row.addWidget(QLabel("排序"), 6, 0)
         tool_row.addWidget(self.sort_combo, 6, 1, 1, 2)
         tool_row.addWidget(self.auto_match_check, 6, 3)
 
@@ -439,7 +439,7 @@ class PalettePanel(QWidget):
             render_actions.addWidget(button, index // 3, index % 3)
 
         hex_row = QHBoxLayout()
-        hex_row.addWidget(QLabel("Precise Hex"))
+        hex_row.addWidget(QLabel("精确 Hex"))
         hex_row.addWidget(self.hex_edit, 1)
 
         content = QWidget()
@@ -447,13 +447,13 @@ class PalettePanel(QWidget):
         layout.setContentsMargins(4, 8, 4, 8)
         layout.addWidget(title)
         layout.addLayout(tool_row)
-        layout.addWidget(_section_label("Source -> Render Board"))
+        layout.addWidget(_section_label("源色 -> 输出色"))
         layout.addWidget(self.match_board)
         layout.addLayout(render_actions)
         layout.addLayout(hex_row)
-        layout.addWidget(_section_label("A -> B Mapping"))
+        layout.addWidget(_section_label("当前配对"))
         layout.addWidget(self.mapping_view)
-        layout.addWidget(_section_label("Color Space"))
+        layout.addWidget(_section_label("色彩空间"))
         layout.addWidget(self.color_space_widget)
         layout.addWidget(self.status_label)
         layout.addStretch(1)
@@ -514,9 +514,9 @@ class PalettePanel(QWidget):
         self._sync_hex_edit()
         self._update_mapping_view()
         if self.auto_match_enabled():
-            self._set_status("AutoMatch palette")
+            self._set_status("自动匹配色盘")
         else:
-            self._set_status("Custom palette" if self.has_custom_palette() else "Automatic palette")
+            self._set_status("自定义色盘" if self.has_custom_palette() else "自动色盘")
 
     def _on_source_color_clicked(self, index: int) -> None:
         self._selected_source_index = index
@@ -551,7 +551,7 @@ class PalettePanel(QWidget):
 
     def _add_with_color_dialog(self) -> None:
         default = self._colors[self._selected_render_index] if self._selected_index() is not None else "#000000"
-        selected = QColorDialog.getColor(QColor(default), self, "Add render palette color")
+        selected = QColorDialog.getColor(QColor(default), self, "添加输出色盘颜色")
         if not selected.isValid():
             return
         self.add_color(selected.name())
@@ -560,7 +560,7 @@ class PalettePanel(QWidget):
         index = self._selected_index()
         if index is None:
             return
-        selected = QColorDialog.getColor(QColor(self._colors[index]), self, "Replace render palette color")
+        selected = QColorDialog.getColor(QColor(self._colors[index]), self, "替换输出色盘颜色")
         if not selected.isValid():
             return
         self.replace_selected_color(selected.name())
@@ -568,36 +568,36 @@ class PalettePanel(QWidget):
     def _choose_load_path(self) -> Path | None:
         selected, _ = QFileDialog.getOpenFileName(
             self,
-            "Load palette",
+            "加载色盘",
             "",
-            "Palette files (*.yaml *.yml);;All files (*.*)",
+            "色盘文件 (*.yaml *.yml);;所有文件 (*.*)",
         )
         return Path(selected) if selected else None
 
     def _choose_save_path(self) -> Path | None:
         selected, _ = QFileDialog.getSaveFileName(
             self,
-            "Save palette",
+            "保存色盘",
             "palette.yaml",
-            "Palette files (*.yaml *.yml);;All files (*.*)",
+            "色盘文件 (*.yaml *.yml);;所有文件 (*.*)",
         )
         return Path(selected) if selected else None
 
     def _choose_image_path(self) -> Path | None:
         selected, _ = QFileDialog.getOpenFileName(
             self,
-            "Extract palette from image",
+            "从图像提取色盘",
             "",
-            "Image files (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;All files (*.*)",
+            "图像文件 (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;所有文件 (*.*)",
         )
         return Path(selected) if selected else None
 
     def _choose_lospec_path(self) -> Path | None:
         selected, _ = QFileDialog.getOpenFileName(
             self,
-            "Import Lospec palette",
+            "导入 Lospec 色盘",
             "",
-            "Palette text files (*.hex *.txt);;All files (*.*)",
+            "色盘文本文件 (*.hex *.txt);;所有文件 (*.*)",
         )
         return Path(selected) if selected else None
 
@@ -775,13 +775,13 @@ class ColorMatchBoard(QWidget):
         self._clear()
         self._row_count = len(rows)
         if not rows:
-            empty = QLabel("Extract source colors or add render colors to build a comparison board")
+            empty = QLabel("提取源色或添加输出色后，会在这里显示配对关系")
             empty.setWordWrap(True)
             empty.setStyleSheet("color: #8b949e; padding: 8px; background: #151719; border: 1px solid #3a3f45;")
             self._layout.addWidget(empty, 0, 0, 1, 3)
             return
 
-        for column, title in enumerate(("Source", "Match", "Render")):
+        for column, title in enumerate(("源色", "关系", "输出色")):
             header = QLabel(title)
             header.setStyleSheet("color: #8b949e; font-weight: 600;")
             self._layout.addWidget(header, 0, column)
@@ -807,14 +807,14 @@ class ColorMatchBoard(QWidget):
 
     def _source_widget(self, row: MatchBoardRow, selected_source_index: int | None) -> QWidget:
         if row.source_color is None or row.source_index is None:
-            return _empty_match_cell("no source")
+            return _empty_match_cell("无源色")
         button = MatchSwatchButton(row.source_index, row.source_color, selected_source_index == row.source_index)
         button.clicked.connect(lambda checked=False, value=row.source_index: self.sourceClicked.emit(value))
         return button
 
     def _render_widget(self, row: MatchBoardRow, selected_render_index: int | None) -> QWidget:
         if row.render_color is None or row.render_index is None:
-            return _empty_match_cell("no render")
+            return _empty_match_cell("无输出色")
         button = MatchSwatchButton(row.render_index, row.render_color, selected_render_index == row.render_index)
         button.clicked.connect(lambda checked=False, value=row.render_index: self.renderClicked.emit(value))
         button.doubleClicked.connect(lambda value: self.renderDoubleClicked.emit(value))
@@ -822,10 +822,10 @@ class ColorMatchBoard(QWidget):
 
     def _relation_text(self, row: MatchBoardRow, auto_match_enabled: bool) -> str:
         if row.source_index is None:
-            return "render only"
+            return "仅输出"
         if row.render_index is None:
-            return "unmatched"
-        mode = "perceptual" if auto_match_enabled and row.mode == "auto" else row.mode
+            return "未匹配"
+        mode = "感知" if auto_match_enabled and row.mode == "auto" else _relation_mode_text(row.mode)
         distance = "" if row.distance is None else f"\n{row.distance:.3f}"
         return f"{mode}\n#{row.source_index + 1} -> #{row.render_index + 1}{distance}"
 
@@ -914,7 +914,7 @@ class ColorMappingView(QWidget):
         super().__init__()
         self.source_chip = QLabel()
         self.target_chip = QLabel()
-        self.mapping_label = QLabel("Select a source color to see nearest render color")
+        self.mapping_label = QLabel("选择一个源色，查看它对应的输出色")
         self.mapping_label.setWordWrap(True)
 
         layout = QHBoxLayout(self)
@@ -928,19 +928,19 @@ class ColorMappingView(QWidget):
         self._set_chip(self.source_chip, source)
         self._set_chip(self.target_chip, target)
         if source is None or target is None:
-            self.mapping_label.setText("Select a source color to see its render pairing")
+            self.mapping_label.setText("选择一个源色，查看它的输出配对")
             return
         label = {
-            "manual": "manual reference",
-            "automatch": "AutoMatch perceptual",
-            "nearest": "nearest color",
+            "manual": "手动参考",
+            "automatch": "自动匹配感知距离",
+            "nearest": "最近颜色",
         }.get(mode, mode)
         if mode == "automatch":
             distance = perceptual_color_distance(source, target)
-            self.mapping_label.setText(f"{source} -> {target} ({label}, perceptual distance {distance:.3f})")
+            self.mapping_label.setText(f"{source} -> {target}（{label} {distance:.3f}）")
             return
         distance = rgb_distance(source, target)
-        self.mapping_label.setText(f"{source} -> {target} ({label}, RGB distance {distance:.1f})")
+        self.mapping_label.setText(f"{source} -> {target}（{label}，RGB 距离 {distance:.1f}）")
 
     def _set_chip(self, label: QLabel, color: str | None) -> None:
         label.setFixedSize(QSize(48, 42))
@@ -981,7 +981,7 @@ class ColorSpaceWidget(QWidget):
         painter.setPen(QPen(QColor("#3a3f45"), 1))
         painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
         painter.setPen(QColor("#8b949e"))
-        painter.drawText(8, 16, "Hue -> / Brightness")
+        painter.drawText(8, 16, "色相 -> / 亮度")
 
         self._paint_points(painter, self._source_colors, QColor("#fbbf24"), square=True)
         self._paint_points(painter, self._render_colors, QColor("#7dd3fc"), square=False)
@@ -1018,6 +1018,16 @@ def _empty_match_cell(text: str) -> QLabel:
     label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     label.setStyleSheet("background: #151719; color: #8b949e; border: 1px solid #3a3f45; font-size: 10px;")
     return label
+
+
+def _relation_mode_text(mode: str) -> str:
+    return {
+        "nearest": "最近",
+        "auto": "自动",
+        "extra": "额外",
+        "source": "源色",
+        "render": "输出",
+    }.get(mode, mode)
 
 
 def _swatch_stylesheet(color: str, selected: bool) -> str:

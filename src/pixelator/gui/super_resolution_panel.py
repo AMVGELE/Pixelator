@@ -36,10 +36,10 @@ class SuperResolutionPanel(QWidget):
         self._source_path: Path | None = None
         self._output_path: Path | None = None
 
-        self.local_image_button = QPushButton("Local Image")
-        self.queue_image_button = QPushButton("Current Queue")
-        self.recent_qwen_button = QPushButton("Recent Qwen")
-        self.source_label = QLabel("No source selected")
+        self.local_image_button = QPushButton("本地图像")
+        self.queue_image_button = QPushButton("当前队列")
+        self.recent_qwen_button = QPushButton("最近 Qwen")
+        self.source_label = QLabel("未选择来源")
         self.source_label.setWordWrap(True)
 
         self.factor_combo = QComboBox()
@@ -53,19 +53,19 @@ class SuperResolutionPanel(QWidget):
         self.quality_spin.setRange(1, 100)
         self.quality_spin.setValue(95)
 
-        self.run_button = QPushButton("Run Super Resolution")
-        self.open_output_button = QPushButton("Open Output Dir")
-        self.add_to_queue_button = QPushButton("Add To Queue")
-        self.set_reference_button = QPushButton("Set Reference")
+        self.run_button = QPushButton("开始超分")
+        self.open_output_button = QPushButton("打开输出目录")
+        self.add_to_queue_button = QPushButton("加入队列")
+        self.set_reference_button = QPushButton("设为色盘参考")
         self.add_to_queue_button.setEnabled(False)
         self.set_reference_button.setEnabled(False)
 
-        self.status_label = QLabel("idle")
-        self.before_preview = self._preview_label("Before")
-        self.after_preview = self._preview_label("After")
-        self.before_size_label = QLabel("Before: -")
-        self.after_size_label = QLabel("After: -")
-        self.output_path_label = QLabel("Output: -")
+        self.status_label = QLabel("空闲")
+        self.before_preview = self._preview_label("原图")
+        self.after_preview = self._preview_label("结果")
+        self.before_size_label = QLabel("原图：-")
+        self.after_size_label = QLabel("结果：-")
+        self.output_path_label = QLabel("输出：-")
         self.output_path_label.setWordWrap(True)
         self.error_label = QLabel("")
         self.error_label.setWordWrap(True)
@@ -76,7 +76,7 @@ class SuperResolutionPanel(QWidget):
 
     def options(self) -> SuperResolutionOptions:
         if self._source_path is None:
-            raise ValueError("Select a source image first.")
+            raise ValueError("请先选择来源图像。")
         return SuperResolutionOptions(
             source_path=self._source_path,
             upscale_factor=int(self.factor_combo.currentData() or 2),
@@ -90,42 +90,42 @@ class SuperResolutionPanel(QWidget):
         self._source_path = source_path
         self._output_path = None
         self.source_label.setText(label or str(source_path))
-        self.status_label.setText("idle")
-        self.before_size_label.setText(f"Before: {image.width} x {image.height}")
-        self.after_size_label.setText("After: -")
-        self.output_path_label.setText("Output: -")
+        self.status_label.setText("空闲")
+        self.before_size_label.setText(f"原图：{image.width} x {image.height}")
+        self.after_size_label.setText("结果：-")
+        self.output_path_label.setText("输出：-")
         self.error_label.setText("")
         self.add_to_queue_button.setEnabled(False)
         self.set_reference_button.setEnabled(False)
         self._set_preview(self.before_preview, source_path)
-        self.after_preview.setText("After")
+        self.after_preview.setText("结果")
 
     def set_running(self, running: bool) -> None:
         self.run_button.setEnabled(not running)
         self.local_image_button.setEnabled(not running)
         self.queue_image_button.setEnabled(not running)
         self.recent_qwen_button.setEnabled(not running)
-        self.status_label.setText("running" if running else self.status_label.text())
+        self.status_label.setText("处理中" if running else self.status_label.text())
 
     def set_result(self, result: SuperResolutionResult) -> None:
         self._output_path = result.output_path
-        self.status_label.setText("succeeded")
-        self.after_size_label.setText(f"After: {result.after_size[0]} x {result.after_size[1]}")
-        self.output_path_label.setText(f"Output: {result.output_path}")
+        self.status_label.setText("成功")
+        self.after_size_label.setText(f"结果：{result.after_size[0]} x {result.after_size[1]}")
+        self.output_path_label.setText(f"输出：{result.output_path}")
         self.error_label.setText("")
         self._set_preview(self.after_preview, result.output_path)
         self.add_to_queue_button.setEnabled(True)
         self.set_reference_button.setEnabled(True)
 
     def set_error(self, message: str) -> None:
-        self.status_label.setText("failed")
+        self.status_label.setText("失败")
         self.error_label.setText(message)
 
     def _build_layout(self) -> None:
-        title = QLabel("Super Resolution / 超分")
+        title = QLabel("超分")
         title.setObjectName("panelTitle")
 
-        source_group = QGroupBox("Input Source")
+        source_group = QGroupBox("输入来源")
         source_buttons = QHBoxLayout()
         source_buttons.addWidget(self.local_image_button)
         source_buttons.addWidget(self.queue_image_button)
@@ -134,13 +134,13 @@ class SuperResolutionPanel(QWidget):
         source_layout.addLayout(source_buttons)
         source_layout.addWidget(self.source_label)
 
-        parameter_group = QGroupBox("Parameters")
+        parameter_group = QGroupBox("参数")
         parameter_form = QFormLayout(parameter_group)
-        parameter_form.addRow("UpscaleFactor", self.factor_combo)
-        parameter_form.addRow("OutputFormat", self.format_combo)
-        parameter_form.addRow("jpg quality", self.quality_spin)
+        parameter_form.addRow("放大倍数", self.factor_combo)
+        parameter_form.addRow("输出格式", self.format_combo)
+        parameter_form.addRow("JPG 质量", self.quality_spin)
 
-        preview_group = QGroupBox("Preview")
+        preview_group = QGroupBox("预览")
         preview_grid = QGridLayout(preview_group)
         preview_grid.addWidget(self.before_preview, 0, 0)
         preview_grid.addWidget(self.after_preview, 0, 1)
@@ -159,7 +159,7 @@ class SuperResolutionPanel(QWidget):
         layout.addWidget(title)
         layout.addWidget(source_group)
         layout.addWidget(parameter_group)
-        layout.addWidget(QLabel("Status"))
+        layout.addWidget(QLabel("状态"))
         layout.addWidget(self.status_label)
         layout.addWidget(preview_group)
         layout.addLayout(action_row)
@@ -178,9 +178,9 @@ class SuperResolutionPanel(QWidget):
     def _choose_local_image(self) -> None:
         selected, _ = QFileDialog.getOpenFileName(
             self,
-            "Select super-resolution source",
+            "选择超分来源图像",
             "",
-            "Image files (*.png *.jpg *.jpeg *.webp *.bmp *.tga *.tif *.tiff);;All files (*.*)",
+            "图像文件 (*.png *.jpg *.jpeg *.webp *.bmp *.tga *.tif *.tiff);;所有文件 (*.*)",
         )
         if selected:
             try:

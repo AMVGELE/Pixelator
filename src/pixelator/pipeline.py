@@ -7,11 +7,11 @@ from typing import Iterable, Iterator
 
 from PIL import Image
 
-from pixelator.config import RenderConfig
-from pixelator.effects import apply_effects
+from pixelator.config import EffectsConfig, RenderConfig
+from pixelator.effects import apply_effects, apply_palette_dither, dither_enabled
 from pixelator.errors import ImageError, MediaError, VideoError
 from pixelator.image_io import load_static_image, save_static_image
-from pixelator.image_ops import adjust_frame, pixelate_frame
+from pixelator.image_ops import adjust_frame, pixelate_frame, pixelate_frame_low
 from pixelator.media import is_image_path, is_video_path
 from pixelator.palette import (
     apply_auto_match_palette,
@@ -33,6 +33,8 @@ from pixelator.video import (
     write_gif,
     write_video,
 )
+
+_FPS_MISMATCH_TOLERANCE = 0.05
 
 
 def prepare_source_frames(
@@ -86,6 +88,16 @@ def _even_encoder_dimension(value: int) -> int:
     return value if value % 2 == 0 else value - 1
 
 
+def _metadata_with_decoded_timing(metadata: VideoMetadata, frame_count: int) -> VideoMetadata:
+    if frame_count < 1 or metadata.duration is None or metadata.duration <= 0 or metadata.fps <= 0:
+        return metadata
+    decoded_fps = frame_count / metadata.duration
+    relative_delta = abs(decoded_fps - metadata.fps) / metadata.fps
+    if relative_delta <= _FPS_MISMATCH_TOLERANCE:
+        return metadata
+    return replace(metadata, fps=decoded_fps)
+
+
 def process_frames(
     frames: Iterable[Image.Image],
     config: RenderConfig,
@@ -96,27 +108,75 @@ def process_frames(
     explicit_palette = custom_palette(config.palette) if use_palette else None
     auto_match = auto_match_palette(config.palette) if use_palette else None
     palette = None
+    use_pixel_space_dither = use_palette and _use_pixel_space_dither(config, auto_match)
     if use_palette and explicit_palette is None and auto_match is None and config.mode == "stable":
         samples = sample_frames(frame_list, config.palette.sample_frames)
-        adjusted_samples = [adjust_frame(pixelate_frame(frame, config.pixel), config.image) for frame in samples]
+        if use_pixel_space_dither:
+            adjusted_samples = [
+                adjust_frame(pixelate_frame_low(frame, config.pixel), config.image) for frame in samples
+            ]
+        else:
+            adjusted_samples = [adjust_frame(pixelate_frame(frame, config.pixel), config.image) for frame in samples]
         palette = build_global_palette(adjusted_samples, config.palette)
 
     for index, frame in enumerate(frame_list):
-        result = pixelate_frame(frame, config.pixel)
+        result = (
+            pixelate_frame_low(frame, config.pixel)
+            if use_pixel_space_dither
+            else pixelate_frame(frame, config.pixel)
+        )
         result = adjust_frame(result, config.image)
-        if use_palette and explicit_palette is None and auto_match is None and config.mode == "stable" and palette is not None:
-            result = apply_palette(result, palette)
-        elif use_palette and explicit_palette is None and auto_match is None:
-            result = quantize_per_frame(result, config.palette)
-        result = apply_effects(result, config.effects, frame_index=index)
-        if explicit_palette is not None:
-            result = apply_palette(result, explicit_palette)
-        elif auto_match is not None:
-            source_colors, target_colors, sort_mode = auto_match
-            result = apply_auto_match_palette(result, source_colors, target_colors, sort_mode)
-        if result.size != metadata.size:
+        result = _apply_palette_and_effects(result, config, palette, explicit_palette, auto_match, index, use_palette)
+        if use_pixel_space_dither:
+            result = result.resize(metadata.size, Image.Resampling.NEAREST)
+        elif result.size != metadata.size:
             result = result.resize(metadata.size, Image.Resampling.NEAREST)
         yield result
+
+
+def _apply_palette_and_effects(
+    result: Image.Image,
+    config: RenderConfig,
+    palette: list[tuple[int, int, int]] | None,
+    explicit_palette: list[tuple[int, int, int]] | None,
+    auto_match: tuple[list[tuple[int, int, int]], list[tuple[int, int, int]], str] | None,
+    index: int,
+    use_palette: bool = True,
+) -> Image.Image:
+    if not use_palette:
+        return apply_effects(result, config.effects, frame_index=index)
+    if explicit_palette is None and auto_match is None and config.mode == "stable" and palette is not None:
+        result = _apply_palette_with_optional_dither(result, palette, config.effects)
+    elif explicit_palette is None and auto_match is None:
+        if dither_enabled(config.effects):
+            frame_palette = build_global_palette([result], config.palette)
+            result = apply_palette_dither(result, frame_palette, config.effects)
+        else:
+            result = quantize_per_frame(result, config.palette)
+    result = apply_effects(result, config.effects, frame_index=index)
+    if explicit_palette is not None:
+        result = _apply_palette_with_optional_dither(result, explicit_palette, config.effects)
+    elif auto_match is not None:
+        source_colors, target_colors, sort_mode = auto_match
+        result = apply_auto_match_palette(result, source_colors, target_colors, sort_mode)
+    return result
+
+
+def _use_pixel_space_dither(
+    config: RenderConfig,
+    auto_match: tuple[list[tuple[int, int, int]], list[tuple[int, int, int]], str] | None,
+) -> bool:
+    return auto_match is None and dither_enabled(config.effects) and config.effects.dither_space == "pixel"
+
+
+def _apply_palette_with_optional_dither(
+    image: Image.Image,
+    palette: list[tuple[int, int, int]],
+    effects: EffectsConfig,
+) -> Image.Image:
+    if dither_enabled(effects):
+        return apply_palette_dither(image, palette, effects)
+    return apply_palette(image, palette)
 
 
 def render_video(input_path: str | Path, output_path: str | Path, config: RenderConfig) -> Path:
@@ -129,6 +189,7 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
     input_is_gif = is_gif_path(input_file)
     metadata = probe_video(input_file)
     frames = list(iter_frames(input_file))
+    metadata = _metadata_with_decoded_timing(metadata, len(frames))
     frames, metadata = prepare_source_frames(frames, config, metadata, encoder_safe=not output_is_gif)
 
     if output_is_gif:
@@ -143,8 +204,7 @@ def render_video(input_path: str | Path, output_path: str | Path, config: Render
         if config.output.keep_audio and not input_is_gif:
             try:
                 trim_start = config.trim.start if config.trim is not None else 0.0
-                trim_duration = metadata.duration if config.trim is not None else None
-                mux_audio(input_file, silent_output, final_output, trim_start, trim_duration)
+                mux_audio(input_file, silent_output, final_output, trim_start, metadata.duration)
             except VideoError:
                 if config.output.audio_failure == "stop":
                     raise

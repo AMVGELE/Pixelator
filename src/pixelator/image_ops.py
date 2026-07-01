@@ -22,10 +22,15 @@ def resolve_pixel_size(size: tuple[int, int], config: PixelConfig) -> tuple[int,
 
 
 def pixelate_frame(image: Image.Image, config: PixelConfig) -> Image.Image:
+    low = pixelate_frame_low(image, config)
+    source = image.convert("RGB")
+    return low.resize(source.size, Image.Resampling.NEAREST)
+
+
+def pixelate_frame_low(image: Image.Image, config: PixelConfig) -> Image.Image:
     source = image.convert("RGB")
     low_size = resolve_pixel_size(source.size, config)
-    low = _resize_linear_light(source, low_size)
-    return low.resize(source.size, Image.Resampling.NEAREST)
+    return _resize_linear_light(source, low_size)
 
 
 def adjust_frame(image: Image.Image, config: ImageConfig) -> Image.Image:

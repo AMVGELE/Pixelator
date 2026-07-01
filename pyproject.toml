@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pixelator"
-version = "1.2.0"
+version = "1.3.0"
 description = "CLI and desktop media-to-light-pixel-art workflow tool."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,6 +37,9 @@ pixelator-layer-service = "pixelator.layering_service.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"pixelator.gui" = ["assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

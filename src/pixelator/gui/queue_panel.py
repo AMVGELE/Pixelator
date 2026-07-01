@@ -23,18 +23,18 @@ class QueuePanel(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setAcceptDrops(True)
-        self.add_button = QPushButton("Add")
-        self.folder_button = QPushButton("Folder")
-        self.remove_button = QPushButton("Remove")
-        self.start_button = QPushButton("Start")
-        self.cancel_button = QPushButton("Cancel")
+        self.add_button = QPushButton("添加")
+        self.folder_button = QPushButton("文件夹")
+        self.remove_button = QPushButton("移除")
+        self.start_button = QPushButton("开始")
+        self.cancel_button = QPushButton("取消")
         self.list_widget = QListWidget()
         self.list_widget.setAcceptDrops(True)
         self.list_widget.viewport().setAcceptDrops(True)
         self.list_widget.installEventFilter(self)
         self.list_widget.viewport().installEventFilter(self)
 
-        title = QLabel("Queue")
+        title = QLabel("队列")
         title.setObjectName("panelTitle")
 
         action_row = QHBoxLayout()
@@ -57,11 +57,11 @@ class QueuePanel(QWidget):
         self.list_widget.clear()
         for job in jobs:
             name = job.source_path.name
-            kind = "image" if job.is_image else "video"
+            kind = "图像" if job.is_image else "视频"
             meta = ""
             if job.width and job.height:
                 meta = f" {job.width}x{job.height}"
-            item = QListWidgetItem(f"{name}{meta} [{kind}]\n{job.status.value} - {job.progress}%")
+            item = QListWidgetItem(f"{name}{meta} [{kind}]\n{_status_text(job.status.value)} - {job.progress}%")
             item.setData(Qt.ItemDataRole.UserRole, job.id)
             if job.error:
                 item.setToolTip(job.error)
@@ -117,6 +117,14 @@ class QueuePanel(QWidget):
             if not url.isLocalFile():
                 continue
             path = Path(url.toLocalFile())
-            if path.is_file() and is_media_path(path):
+            if path.is_dir() or (path.is_file() and is_media_path(path)):
                 paths.append(str(path))
         return paths
+def _status_text(status: str) -> str:
+    return {
+        "queued": "排队",
+        "running": "运行",
+        "completed": "完成",
+        "failed": "失败",
+        "cancelled": "已取消",
+    }.get(status, status)

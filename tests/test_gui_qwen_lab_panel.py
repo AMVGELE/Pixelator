@@ -52,8 +52,8 @@ def test_qwen_lab_panel_saves_qwen_key_for_cli(monkeypatch, tmp_path: Path, qapp
 
     assert env_file.read_text(encoding="utf-8") == "DASHSCOPE_API_KEY=saved-lab-key\n"
     assert config_value("DASHSCOPE_API_KEY") == "saved-lab-key"
-    assert panel.key_source_label.text() == "Saved to .env.local; CLI uses DASHSCOPE_API_KEY"
-    assert "Saved Qwen API key" in panel.status_label.text()
+    assert panel.key_source_label.text() == "已保存到 .env.local；CLI 使用 DASHSCOPE_API_KEY"
+    assert "已保存 Qwen API key" in panel.status_label.text()
 
 
 def test_qwen_lab_panel_builds_dynamic_resolution_request(qapp):
@@ -79,7 +79,7 @@ def test_qwen_lab_panel_rejects_size_outside_qwen_pixel_budget(qapp):
     panel.width_spin.setValue(256)
     panel.height_spin.setValue(256)
 
-    with pytest.raises(ValueError, match="between 512x512 and 2048x2048"):
+    with pytest.raises(ValueError, match="512x512 和 2048x2048"):
         panel.generation_request()
 
 
@@ -87,8 +87,8 @@ def test_main_window_has_qwen_lab_tab(qapp):
     window = MainWindow()
 
     assert window.right_tabs.count() == 5
-    assert window.right_tabs.tabText(2) == "AI Assets"
-    assert window.right_tabs.tabText(3) == "Qwen Lab"
+    assert window.right_tabs.tabText(2) == "AI 资产"
+    assert window.right_tabs.tabText(3) == "Qwen 实验室"
     window.close()
 
 
@@ -97,10 +97,11 @@ def test_main_window_auto_adds_qwen_lab_outputs_to_queue(tmp_path: Path, qapp):
     Image.new("RGBA", (4, 4), (255, 0, 0, 255)).save(source)
     window = MainWindow()
     record = _record(source)
+    previous_count = window.qwen_lab_panel.result_list.count()
 
     window._on_qwen_lab_generation_completed([record])
 
-    assert window.qwen_lab_panel.result_list.count() == 1
+    assert window.qwen_lab_panel.result_list.count() == previous_count + 1
     assert len(window.queue.jobs) == 1
     assert window.queue.jobs[0].source_path == source
     window.close()
@@ -116,7 +117,7 @@ def test_main_window_uses_recent_qwen_output_for_super_resolution(tmp_path: Path
     window._use_recent_qwen_output_for_super_resolution()
 
     assert window.super_resolution_panel.options().source_path == source
-    assert window.super_resolution_panel.before_size_label.text() == "Before: 5 x 6"
+    assert window.super_resolution_panel.before_size_label.text() == "原图：5 x 6"
     window.close()
 
 
