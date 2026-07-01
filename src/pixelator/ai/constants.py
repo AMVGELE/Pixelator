@@ -105,3 +105,40 @@ DEFAULT_DASHSCOPE_IMAGE_ENDPOINT = (
 DEFAULT_DASHSCOPE_TASK_ENDPOINT = "https://dashscope.aliyuncs.com/api/v1/tasks"
 DEFAULT_TASK_POLL_ATTEMPTS = 20
 DEFAULT_TASK_POLL_INTERVAL_SECONDS = 3.0
+
+# Project-specific preset for Last Protocol L3 placeholder art. The generic
+# Pixelator presets intentionally bias toward sprite/cartoon assets; this one
+# keeps Qwen Lab and AI Assets aimed at grounded sci-fi concept art.
+ART_STYLES = (*ART_STYLES, "last_protocol_realism")
+ART_STYLE_LABELS["last_protocol_realism"] = "Last Protocol Realism"
+ART_STYLE_PROMPT_PARTS[
+    "last_protocol_realism"
+] = (
+    "Last Protocol hard sci-fi realism, cinematic hard sci-fi concept art, "
+    "realistic industrial spaceship interior or prop, grounded military spacecraft design, "
+    "worn metal panels, practical machinery, believable scale, restrained palette, "
+    "cinematic lighting, high detail matte painting, realistic materials, "
+    "no cute stylization, no cartoon outline"
+)
+
+REALISM_BASE_NEGATIVE_EXCLUSIONS = (
+    "鐪熷疄鐓х墖璐ㄦ劅",
+)
+
+REALISM_NEGATIVE_PROMPT_PARTS = (
+    "anime",
+    "manga",
+    "cartoon",
+    "chibi",
+    "cute",
+    "cel shading",
+    "thick outline",
+    "flat color",
+    "toy-like",
+    "colorful mobile game icon",
+    "stylized mobile game",
+    "fantasy",
+    "exaggerated proportions",
+    "childish",
+    "glossy toy plastic",
+)

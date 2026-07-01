@@ -50,15 +50,15 @@ class AiGenerationRequest:
         _validate_choice("style", self.style, ART_STYLES)
         _validate_choice("game_genre", self.game_genre, GAME_GENRES)
         _validate_choice("view", self.view, ASSET_VIEWS)
-        _validate_choice("size", self.size, ASSET_SIZES)
+        if self.size not in ASSET_SIZES:
+            _validate_dynamic_size(self.size)
         _validate_choice("background", self.background, BACKGROUND_MODES)
         if self.count < 1 or self.count > 6:
             raise ValueError("Count must be between 1 and 6.")
 
     @property
     def target_dimensions(self) -> tuple[int, int]:
-        width, height = self.size.split("x", 1)
-        return int(width), int(height)
+        return _parse_size(self.size)
 
 
 @dataclass(frozen=True)
@@ -108,6 +108,25 @@ class AiAssetRecord:
 def _validate_choice(field_name: str, value: str, choices: tuple[str, ...]) -> None:
     if value not in choices:
         raise ValueError(f"{field_name} must be one of: {', '.join(choices)}.")
+
+
+def _validate_dynamic_size(value: str) -> None:
+    width, height = _parse_size(value)
+    if width <= 0 or height <= 0:
+        raise ValueError("size dimensions must be positive.")
+    if width % 16 != 0 or height % 16 != 0:
+        raise ValueError("size dimensions must use 16 pixel steps.")
+    pixels = width * height
+    if pixels < 512 * 512 or pixels > 2048 * 2048:
+        raise ValueError("size total pixels must be between 512x512 and 2048x2048.")
+
+
+def _parse_size(value: str) -> tuple[int, int]:
+    try:
+        width, height = [int(part) for part in value.lower().split("x", 1)]
+    except (TypeError, ValueError):
+        raise ValueError("size must use WIDTHxHEIGHT format.") from None
+    return width, height
 
 
 def _clean_text(value: str) -> str:

@@ -93,6 +93,23 @@ palette:
     assert config.palette.match_sort == "original"
 
 
+def test_load_config_accepts_original_palette_strategy(tmp_path: Path):
+    path = tmp_path / "pixelator.yaml"
+    path.write_text(
+        """
+palette:
+  strategy: original
+  colors: 2
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(path)
+
+    assert config.palette.strategy == "original"
+    assert config.palette.colors == 2
+
+
 def test_cli_overrides_replace_nested_values():
     base = RenderConfig()
 
@@ -158,6 +175,20 @@ def test_source_palette_requires_auto_match_strategy():
     config = config_from_dict({"palette": {"source_colors": ["#000000", "#ffffff"]}})
 
     with pytest.raises(ConfigError, match="source_colors"):
+        validate_config(config)
+
+
+def test_original_palette_rejects_custom_colors():
+    config = config_from_dict(
+        {
+            "palette": {
+                "strategy": "original",
+                "custom_colors": ["#000000", "#ffffff"],
+            }
+        }
+    )
+
+    with pytest.raises(ConfigError, match="custom_colors"):
         validate_config(config)
 
 

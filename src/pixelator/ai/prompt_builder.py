@@ -8,6 +8,8 @@ from pixelator.ai.constants import (
     BACKGROUND_PROMPT_PARTS,
     BASE_NEGATIVE_PROMPT_PARTS,
     GAME_GENRE_PROMPT_PARTS,
+    REALISM_BASE_NEGATIVE_EXCLUSIONS,
+    REALISM_NEGATIVE_PROMPT_PARTS,
     VIEW_PROMPT_PARTS,
 )
 from pixelator.ai.types import AiGenerationRequest, PromptResult, StyleProfile
@@ -33,11 +35,12 @@ def build_prompt(request: AiGenerationRequest) -> PromptResult:
     )
     negative_parts = _compact_parts(
         [
-            *BASE_NEGATIVE_PROMPT_PARTS,
+            *_base_negative_prompt_parts(request.style),
             request.background != "scene" and "杂乱场景背景",
             request.background == "transparent" and "白色背景",
             request.background == "transparent" and "假透明背景",
             request.background == "transparent" and "棋盘格背景",
+            *_style_negative_prompt_parts(request.style),
             *profile_parts["negative"],
         ]
     )
@@ -65,6 +68,18 @@ def _build_style_profile_parts(profile: StyleProfile) -> dict[str, list[str]]:
         "negative": negative,
         "applied": [*positive, *[f"避免元素：{part}" for part in negative]],
     }
+
+
+def _base_negative_prompt_parts(style: str) -> list[str]:
+    if style != "last_protocol_realism":
+        return list(BASE_NEGATIVE_PROMPT_PARTS)
+    return [part for part in BASE_NEGATIVE_PROMPT_PARTS if part not in REALISM_BASE_NEGATIVE_EXCLUSIONS]
+
+
+def _style_negative_prompt_parts(style: str) -> list[str]:
+    if style == "last_protocol_realism":
+        return list(REALISM_NEGATIVE_PROMPT_PARTS)
+    return []
 
 
 def _normalize_description(description: str) -> str:

@@ -60,6 +60,36 @@ def test_dashscope_client_downloads_direct_image_and_normalizes_request_size():
     assert transport.posts[0][1]["parameters"]["size"] == "512*512"
 
 
+def test_dashscope_client_preserves_dynamic_qwen_lab_size():
+    image_bytes = _png_bytes()
+    transport = FakeTransport(
+        (200, b'{"output":{"results":[{"url":"https://example.test/image.png"}]}}'),
+        [(200, image_bytes)],
+    )
+    request = AiGenerationRequest(description="Wide prop sheet", size="384x768", background="solid")
+    client = DashScopeClient(DashScopeConfig(api_key="key"), transport=transport)
+
+    client.generate(request, build_prompt(request))
+
+    assert transport.posts[0][1]["parameters"]["size"] == "384*768"
+
+
+def test_dashscope_client_requests_multiple_outputs_as_single_image_calls():
+    image_bytes = _png_bytes()
+    transport = FakeTransport(
+        (200, b'{"output":{"results":[{"url":"https://example.test/image.png"}]}}'),
+        [(200, image_bytes), (200, image_bytes), (200, image_bytes)],
+    )
+    request = AiGenerationRequest(description="Potion set", size="512x512", background="solid", count=3)
+    client = DashScopeClient(DashScopeConfig(api_key="key"), transport=transport)
+
+    images = client.generate(request, build_prompt(request))
+
+    assert len(images) == 3
+    assert len(transport.posts) == 3
+    assert [post[1]["parameters"]["n"] for post in transport.posts] == [1, 1, 1]
+
+
 def test_dashscope_client_polls_async_task_until_image_is_available():
     image_bytes = _png_bytes((0, 255, 0, 255))
     transport = FakeTransport(

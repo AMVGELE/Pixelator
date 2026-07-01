@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+import pixelator.palette_studio as palette_studio
 from pixelator.errors import ConfigError
 from pixelator.palette_studio import (
     auto_match_palette_pairs,
@@ -145,6 +146,24 @@ def test_auto_match_palette_pairs_default_to_perceptual_nearest():
         ("#ff0000", "#ff3300"),
         ("#0000ff", "#0030ff"),
     ]
+
+
+def test_auto_match_palette_pairs_precomputes_rank_fallback(monkeypatch):
+    calls = []
+    original_sort = palette_studio.sort_palette_colors
+
+    def counted_sort(colors, mode):
+        calls.append((tuple(colors), mode))
+        return original_sort(colors, mode)
+
+    monkeypatch.setattr(palette_studio, "sort_palette_colors", counted_sort)
+    source = [f"#{(index * 47) % 256:02x}{(index * 83) % 256:02x}{(index * 131) % 256:02x}" for index in range(16)]
+    target = list(reversed(source))
+
+    pairs = palette_studio.auto_match_palette_pairs(source, target, "hue_brightness")
+
+    assert len(pairs) == 16
+    assert len(calls) <= 2
 
 
 def test_perceptual_color_distance_prefers_similar_hue_and_neutrality():

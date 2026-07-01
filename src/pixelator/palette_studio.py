@@ -188,6 +188,7 @@ def auto_match_palette_pairs(
     if not source or not target:
         return []
     if mode == "perceptual":
+        source_rank_positions, target_rank_positions = _rank_fallback_positions(source, target, sort_mode)
         return [
             (
                 source_color,
@@ -195,7 +196,7 @@ def auto_match_palette_pairs(
                     target,
                     key=lambda target_color: (
                         perceptual_color_distance(source_color, target_color),
-                        _rank_fallback_distance(source_color, target_color, source, target, sort_mode),
+                        _rank_fallback_distance(source_color, target_color, source_rank_positions, target_rank_positions),
                     ),
                 ),
             )
@@ -227,21 +228,31 @@ def _rank_match_palette_pairs(source_colors: list[str], target_colors: list[str]
     return [(source_color, target[round(index * scale)]) for index, source_color in enumerate(source)]
 
 
-def _rank_fallback_distance(
-    source_color: str,
-    target_color: str,
+def _rank_fallback_positions(
     source_colors: list[str],
     target_colors: list[str],
     sort_mode: str,
-) -> float:
+) -> tuple[dict[str, float], dict[str, float]]:
     try:
         source_sorted = sort_palette_colors(source_colors, sort_mode)
         target_sorted = sort_palette_colors(target_colors, sort_mode)
     except ConfigError:
+        return {}, {}
+    return (
+        {color: _normalized_rank(source_sorted, color) for color in source_sorted},
+        {color: _normalized_rank(target_sorted, color) for color in target_sorted},
+    )
+
+
+def _rank_fallback_distance(
+    source_color: str,
+    target_color: str,
+    source_rank_positions: dict[str, float],
+    target_rank_positions: dict[str, float],
+) -> float:
+    if not source_rank_positions or not target_rank_positions:
         return 0.0
-    source_position = _normalized_rank(source_sorted, source_color)
-    target_position = _normalized_rank(target_sorted, target_color)
-    return abs(source_position - target_position)
+    return abs(source_rank_positions.get(source_color, 0.0) - target_rank_positions.get(target_color, 0.0))
 
 
 def nearest_palette_color(source: str, palette: list[str]) -> str | None:

@@ -1,7 +1,16 @@
 from PIL import Image
 import pytest
 
-from pixelator.config import CropConfig, EffectsConfig, OutputConfig, PaletteConfig, PixelConfig, RenderConfig, TrimConfig
+from pixelator.config import (
+    CropConfig,
+    EffectsConfig,
+    ImageConfig,
+    OutputConfig,
+    PaletteConfig,
+    PixelConfig,
+    RenderConfig,
+    TrimConfig,
+)
 from pixelator.errors import MediaError, OutputError
 from pixelator.pipeline import prepare_source_frames, process_frames, render_image, render_media, render_video
 from pixelator.video import VideoMetadata
@@ -102,6 +111,23 @@ def test_process_frames_auto_match_uses_direct_render_fallback_for_uncovered_col
     result = list(process_frames([frame], config, VideoMetadata(width=2, height=1, fps=24.0)))
 
     assert list(result[0].getdata()) == [(238, 238, 238), (0, 0, 0)]
+
+
+def test_process_frames_original_palette_skips_quantization():
+    colors = [(index * 20, 255 - index * 20, index * 10) for index in range(8)]
+    frame = Image.new("RGB", (8, 1))
+    frame.putdata(colors)
+    config = RenderConfig(
+        mode="stable",
+        pixel=PixelConfig(scale=1),
+        palette=PaletteConfig(strategy="original", colors=2),
+        image=ImageConfig(brightness=1.0, sharpness=1.0, saturation=1.0),
+        effects=EffectsConfig(crt="off", vhs="off"),
+    )
+
+    result = list(process_frames([frame], config, VideoMetadata(width=8, height=1, fps=24.0)))
+
+    assert list(result[0].getdata()) == colors
 
 
 def test_prepare_source_frames_applies_crop():

@@ -92,10 +92,11 @@ def process_frames(
     metadata: VideoMetadata,
 ) -> Iterator[Image.Image]:
     frame_list = list(frames)
-    explicit_palette = custom_palette(config.palette)
-    auto_match = auto_match_palette(config.palette)
+    use_palette = config.palette.strategy != "original"
+    explicit_palette = custom_palette(config.palette) if use_palette else None
+    auto_match = auto_match_palette(config.palette) if use_palette else None
     palette = None
-    if explicit_palette is None and auto_match is None and config.mode == "stable":
+    if use_palette and explicit_palette is None and auto_match is None and config.mode == "stable":
         samples = sample_frames(frame_list, config.palette.sample_frames)
         adjusted_samples = [adjust_frame(pixelate_frame(frame, config.pixel), config.image) for frame in samples]
         palette = build_global_palette(adjusted_samples, config.palette)
@@ -103,9 +104,9 @@ def process_frames(
     for index, frame in enumerate(frame_list):
         result = pixelate_frame(frame, config.pixel)
         result = adjust_frame(result, config.image)
-        if explicit_palette is None and auto_match is None and config.mode == "stable" and palette is not None:
+        if use_palette and explicit_palette is None and auto_match is None and config.mode == "stable" and palette is not None:
             result = apply_palette(result, palette)
-        elif explicit_palette is None and auto_match is None:
+        elif use_palette and explicit_palette is None and auto_match is None:
             result = quantize_per_frame(result, config.palette)
         result = apply_effects(result, config.effects, frame_index=index)
         if explicit_palette is not None:

@@ -133,6 +133,20 @@ def test_render_settings_create_config_with_custom_palette():
     assert config.palette.custom_colors == ["#000000", "#ffcc00"]
 
 
+def test_render_settings_original_colors_skip_custom_palette():
+    settings = RenderSettings(
+        palette_strategy="original",
+        custom_palette=["#000000", "#ffcc00"],
+        source_palette=["#ff0000", "#0000ff"],
+    )
+
+    config = settings.to_config()
+
+    assert config.palette.strategy == "original"
+    assert config.palette.custom_colors is None
+    assert config.palette.source_colors is None
+
+
 def test_render_settings_create_config_with_auto_match_palette():
     settings = RenderSettings(
         custom_palette=["#00ff00", "#ffff00"],

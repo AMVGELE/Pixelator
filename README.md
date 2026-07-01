@@ -98,6 +98,19 @@ is too far from every Source color, AutoMatch falls back to the nearest Render
 color so uncovered highlights or background colors do not collapse into dark
 blocks.
 
+Use `strategy: original` when you want only the pixelation pass without palette
+quantization:
+
+```yaml
+palette:
+  strategy: original
+```
+
+In the GUI, set Render -> Palette to `Original Colors`. This skips automatic
+quantization, custom Palette colors, and AutoMatch for that render. Brightness,
+sharpness, saturation, CRT, and VHS are still controlled by their existing Render
+settings.
+
 ## AI Layer Split CLI
 
 `pixelator-layer` sends AI art images to a cloud layer-splitting service. Each
@@ -112,8 +125,7 @@ pixelator-layer split .\inputs --out .\outputs\layers --endpoint https://your-la
 ```
 
 The default Pixelator install does not include Qwen model weights or GPU
-dependencies. For the Aliyun/Bailian deployment path, see
-`docs/layer-split-aliyun.md`.
+dependencies.
 
 ## Desktop GUI
 
@@ -148,15 +160,37 @@ reference palette; Render is the palette that will actually be used for output.
 The `AI Assets` tab can generate new 2D game assets through DashScope Qwen-Image
 and save them as PNG files under `outputs/ai-assets`. Set `DASHSCOPE_API_KEY` in
 the environment, keep it in `.env.local`, or paste it into `AI Assets` ->
-`Provider Settings` -> `Qwen API key` for the current session. The model defaults
-to `qwen-image-2.0`, and the endpoint defaults to the Beijing DashScope image
-generation endpoint. When Background is `Transparent`, the GUI uses
+`Provider Settings` -> `Qwen API key`. The adjacent `Save` button writes
+`DASHSCOPE_API_KEY` to `.env.local` (or `PIXELATOR_ENV_FILE`) so future GUI and
+CLI runs share the same saved key. The model defaults to `qwen-image-2.0`, and
+the endpoint defaults to the Beijing DashScope image generation endpoint. When
+Background is `Transparent`, the GUI uses
 `ALIYUN_VIAPI_CREDENTIALS` to run Aliyun VIAPI background removal before saving
 the PNG. The Aliyun account must have the visual segmentation `SegmentCommonImage`
 API enabled, otherwise Aliyun returns a provider error before Pixelator can save
 the transparent result. Generated PNG assets can be added back into the normal
 Pixelator queue with `Add To Queue`, then cropped, palette matched, pixelated,
 and exported like any other image input.
+
+The `Qwen Lab` tab is a freer prompt workspace for Qwen-Image. Use `Prompt
+Builder` to draft an asset prompt from description, type, style, genre, view, and
+keywords, then edit the final Positive and Negative prompts directly in `Prompt
+Editor`. `Generation` exposes custom width and height controls, count, model,
+endpoint, API key saving, and a `Transparent cutout` mode that runs the same Aliyun VIAPI
+background removal path as `AI Assets`. Qwen Lab saves generated PNGs under
+`outputs/ai-assets` and automatically adds them to the left Pixelator queue so
+they can immediately be cropped, palette matched, pixelated, and exported.
+
+The `Super Resolution / 超分` tab is a separate technical-reserve workflow for
+source/reference images before pixelation. It can use a local image, the selected
+image queue item, or the latest Qwen output, then calls Aliyun VIAPI imageenhan
+`MakeSuperResolutionImage`. Local files use the official SDK advance upload path;
+remote URLs use the signed RPC path. Credentials are read from
+`ALIYUN_VIAPI_CREDENTIALS=AccessKeyId:AccessKeySecret` in the environment or
+`.env.local`, and keys are not written to logs. Outputs are saved under
+`outputs/super-resolution` and can be opened, added back to the queue, or used as
+the Palette tab's source reference. Final pixelated outputs are not routed through
+AI super resolution; use nearest-neighbor integer scaling for finished pixel art.
 
 Palette Studio tools in the Palette tab can extract colors from the current
 preview frame or from an image file, save and load local presets, import local
